@@ -1,3 +1,4 @@
+HEAD
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
 # dependencies
@@ -41,3 +42,54 @@ app-example
 # generated native folders
 /ios
 /android
+
+####################################
+# OS Files
+####################################
+.DS_Store
+Thumbs.db
+
+####################################
+# Logs
+####################################
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+####################################
+# Environment & Secrets
+####################################
+.env
+application-dev.yml
+application-prod.yml
+*.keystore
+*.jks
+*.p12
+*.key
+secrets.*
+credentials.*
+
+####################################
+# Node / React Native
+####################################
+node_modules/
+npm-debug.log
+yarn-error.log
+.expo/
+.expo-shared/
+.web-build/
+dist/
+build/
+
+####################################
+# React Native - Metro
+####################################
+.metro-health-check*
+.metro-cache/
+
+####################################
+# React Native - Android
+####################################
+
+fb4ad1b97996b9200164eb51e9d813940460fa12
