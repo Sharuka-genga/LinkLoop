@@ -1,98 +1,191 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
+import { supabase } from '@/lib/supabase';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const [loading, setLoading] = useState(false);
+  const [statusText, setStatusText] = useState('Checking Connection...');
+  const [isConnected, setIsConnected] = useState<boolean | null>(null);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const checkConnection = async () => {
+    setLoading(true);
+    setStatusText('Pinging Supabase...');
+    try {
+      // Just check if we can query anything or if the client initialized
+      const { error } = await supabase.from('non_existent_table_just_for_ping').select('*').limit(1);
+      
+      // Even if there's an error about non-existent table, it means we connected to the database successfully.
+      // A bad connection would give a fetch error or network request failed.
+      if (error && error.code === '42P01') {
+         // 42P01 is relation does not exist - meaning DB connection works!
+         setIsConnected(true);
+         setStatusText('Connected to Supabase!');
+      } else if (error && error.message && error.message.includes('FetchError')) {
+         setIsConnected(false);
+         setStatusText('Failed to connect.');
+      } else {
+         // Other errors could just mean RLS policy block, which also means connectivity works!
+         setIsConnected(true);
+         setStatusText('Connected to Supabase!');
+      }
+    } catch (err) {
+      setIsConnected(false);
+      setStatusText('Network Error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    checkConnection();
+  }, []);
+
+  return (
+    <View style={styles.container}>
+      <StatusBar style="light" />
+      <LinearGradient
+        colors={['#0F2027', '#203A43', '#2C5364']}
+        style={styles.background}
+      />
+      
+      <View style={styles.content}>
+        <View style={styles.card}>
+          <Text style={styles.headerTitle}>LinkLoop</Text>
+          <Text style={styles.subtitle}>Supabase Status</Text>
+
+          <View style={[styles.statusBox, isConnected === true ? styles.statusSuccess : isConnected === false ? styles.statusError : styles.statusPending]}>
+            {loading ? (
+              <ActivityIndicator color="#ffffff" style={styles.loader} />
+            ) : (
+              <View style={[styles.dot, { backgroundColor: isConnected ? '#4ade80' : '#ef4444' }]} />
+            )}
+            <Text style={styles.statusText}>{statusText}</Text>
+          </View>
+
+          <TouchableOpacity 
+            style={styles.button}
+            onPress={checkConnection}
+            activeOpacity={0.8}
+            disabled={loading}
+          >
+            <Text style={styles.buttonText}>{loading ? 'Checking...' : 'Check Again'}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.note}>
+          The default Welcome screen was replaced to verify your Supabase connectivity!
+        </Text>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
   },
-  stepContainer: {
-    gap: 8,
+  background: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  card: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 24,
+    padding: 32,
+    width: width * 0.9,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  headerTitle: {
+    fontSize: 36,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: 1,
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  subtitle: {
+    fontSize: 14,
+    color: '#94a3b8',
+    marginBottom: 32,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 2,
   },
+  statusBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    marginBottom: 32,
+    borderWidth: 1,
+  },
+  statusPending: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  statusSuccess: {
+    backgroundColor: 'rgba(74, 222, 128, 0.1)',
+    borderColor: 'rgba(74, 222, 128, 0.3)',
+  },
+  statusError: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 10,
+  },
+  loader: {
+    marginRight: 10,
+  },
+  statusText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  button: {
+    backgroundColor: '#38bdf8',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 16,
+    width: '100%',
+    alignItems: 'center',
+    shadowColor: '#38bdf8',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  buttonText: {
+    color: '#0f172a',
+    fontSize: 16,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  note: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    marginTop: 40,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+    fontSize: 12,
+    lineHeight: 18,
+  }
 });
