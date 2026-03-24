@@ -1,5 +1,5 @@
 import { TouchableOpacity, View, Text, StyleSheet } from "react-native";
-import { Home, Bell, Plus, User, Settings } from "lucide-react-native";
+import { Home, Bell, Plus, User, Sparkles } from "lucide-react-native";
 import { useRouter, usePathname } from "expo-router";
 
 export default function NavBar() {
@@ -8,10 +8,10 @@ export default function NavBar() {
 
     const navItems = [
         { icon: Home, label: "Home", route: "/", active: pathname === "/" },
+        { icon: Sparkles, label: "Suggest", route: "/suggestions", active: pathname === "/suggestions" },
         { icon: Bell, label: "Alerts", route: "/notifications", active: pathname === "/notifications" },
         { icon: Plus, label: "Create", route: "/category", active: pathname === "/category", isCreate: true },
         { icon: User, label: "Profile", route: "/profile", active: pathname === "/profile" },
-        { icon: Settings, label: "Settings", route: "/settings", active: pathname === "/settings" },
     ];
 
     return (
