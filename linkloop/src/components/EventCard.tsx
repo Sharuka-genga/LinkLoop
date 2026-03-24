@@ -19,6 +19,7 @@ type Props = {
   joinMode?: "direct" | "request";
   spotsLeft?: number;
   totalSpots?: number;
+  subcategoryLabel?: string;
   onDelete?: () => void;
 };
 
@@ -40,7 +41,7 @@ type JoinState = "idle" | "requested" | "joined";
 export default function EventCard({
   id, title, location, date, time, peopleNeeded, category,
   creatorId, creatorName, creatorAvatar,
-  joinMode = "direct", spotsLeft, totalSpots, onDelete,
+  joinMode = "direct", spotsLeft, totalSpots, subcategoryLabel, onDelete,
 }: Props) {
   const cat = CATEGORY_CONFIG[category] ?? CATEGORY_CONFIG.other;
   const isHost = creatorId === TEST_USER_ID;
@@ -96,9 +97,16 @@ export default function EventCard({
     <View style={styles.card}>
       {/* Top row */}
       <View style={styles.topRow}>
-        <View style={[styles.catPill, { backgroundColor: cat.darkColor }]}>
-          <Zap size={10} color={cat.color} strokeWidth={0} fill={cat.color} />
-          <Text style={[styles.catPillText, { color: cat.color }]}>{cat.label.toUpperCase()}</Text>
+        <View style={styles.catRow}>
+          <View style={[styles.catPill, { backgroundColor: cat.darkColor }]}>
+            <Zap size={10} color={cat.color} strokeWidth={0} fill={cat.color} />
+            <Text style={[styles.catPillText, { color: cat.color }]}>{cat.label.toUpperCase()}</Text>
+          </View>
+          {subcategoryLabel && (
+            <View style={styles.subCatPill}>
+              <Text style={styles.subCatText}>{subcategoryLabel}</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.topRight}>
@@ -273,14 +281,21 @@ const styles = StyleSheet.create({
   },
   topRow: {
     flexDirection: "row", alignItems: "center",
-    justifyContent: "space-between", marginTop: 6, marginBottom: 14,
+    justifyContent: "space-between", marginTop: 4, marginBottom: 14,
   },
+  catRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   topRight: { flexDirection: "row", alignItems: "center", gap: 8 },
   catPill: {
     flexDirection: "row", alignItems: "center",
     paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, gap: 5,
   },
   catPillText: { fontSize: 10, fontWeight: "800", letterSpacing: 1 },
+  subCatPill: {
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.1)",
+  },
+  subCatText: { fontSize: 10, fontWeight: "700", color: "#94A3B8" },
   modePill: {
     flexDirection: "row", alignItems: "center",
     paddingHorizontal: 9, paddingVertical: 5, borderRadius: 20, gap: 5,

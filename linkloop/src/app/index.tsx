@@ -198,6 +198,7 @@ export default function Page() {
               joinMode={event.join_mode}
               spotsLeft={event.people_needed}
               totalSpots={event.people_needed}
+              subcategoryLabel={event.subcategory_label}
               onDelete={loadEvents}
             />
           ))
