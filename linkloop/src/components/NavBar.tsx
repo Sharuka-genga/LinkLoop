@@ -9,8 +9,8 @@ export default function NavBar() {
     const navItems = [
         { icon: Home, label: "Home", route: "/", active: pathname === "/" },
         { icon: Sparkles, label: "Suggest", route: "/suggestions", active: pathname === "/suggestions" },
-        { icon: Bell, label: "Alerts", route: "/notifications", active: pathname === "/notifications" },
         { icon: Plus, label: "Create", route: "/category", active: pathname === "/category", isCreate: true },
+        { icon: Bell, label: "Alerts", route: "/notifications", active: pathname === "/notifications" },
         { icon: User, label: "Profile", route: "/profile", active: pathname === "/profile" },
     ];
 

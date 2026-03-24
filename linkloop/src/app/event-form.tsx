@@ -46,10 +46,10 @@ export default function EventForm() {
       ? (showCustomInput ? customInsideLocation : insideLocation)
       : outsideLocation;
 
-    if (!title.trim()) newErrors.title = "Title is required";
-    if (!loc.trim()) newErrors.location = "Location is required";
+    if (!title.trim()) newErrors.title = "*Title is required*";
+    if (!loc.trim()) newErrors.location = "*Location is required*";
     if (isCustom === "true" && !customActivity.trim())
-      newErrors.customActivity = "Activity is required";
+      newErrors.customActivity = "*Activity is required*";
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -57,7 +57,7 @@ export default function EventForm() {
     const eventD = new Date(date);
     eventD.setHours(0, 0, 0, 0);
 
-    if (eventD < today) newErrors.date = "Cannot select past date";
+    if (eventD < today) newErrors.date = "*Cannot select past date*";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
