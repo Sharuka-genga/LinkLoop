@@ -228,7 +228,7 @@ export default function SuggestedParticipants() {
     eventTitle: string;
   }>();
 
-  const color = categoryColor || "#818CF8";
+  const color = "#818CF8";
   const [page, setPage] = useState(0);
   const [users, setUsers] = useState<User[]>(() => getPage(categoryId || "sports", 0));
   const [inviteStatus, setInviteStatus] = useState<Record<string, "idle" | "sent">>({});
@@ -283,11 +283,6 @@ export default function SuggestedParticipants() {
   const handleInvite = (userId: string, userName: string) => {
     setInviteStatus((p) => ({ ...p, [userId]: "sent" }));
     setSelected(null);
-    Alert.alert(
-      "Invitation Sent!",
-      `${userName} has been invited to your event.`,
-      [{ text: "OK" }]
-    );
   };
 
   const handleDone = () => {

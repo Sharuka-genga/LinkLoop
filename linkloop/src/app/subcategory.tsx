@@ -242,10 +242,10 @@ export default function SubcategorySelect() {
           disabled={!selected}
           activeOpacity={0.85}
         >
-          <Text style={[styles.continueBtnText, { color: selected ? "#fff" : "#475569" }]}>
+          <Text style={[styles.continueBtnText, { color: selected ? "#0F172A" : "#475569" }]}>
             {selected ? "Continue" : "Select an activity"}
           </Text>
-          {selected && <ChevronRight size={18} color="#fff" strokeWidth={3} />}
+          {selected && <ChevronRight size={18} color="#0F172A" strokeWidth={3} />}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

@@ -9,19 +9,17 @@ import { ArrowLeft, Clock, ChevronRight, MapPin, ChevronDown, Check } from "luci
 import { createEvent } from "@/lib/events";
 
 const INSIDE_LOCATIONS = [
-  "SLIIT Grounds", "Sports Complex", "Library",
-  "Engineering Block", "Cafeteria", "Auditorium",
-  "Innovation Lab", "Common Room", "Rooftop",
-  "Type my own...",
+  "Play ground", "Computing faculty", "Business faculty", "Mini auditorium",
+  "Auditorium", "Computer lab", "Engineering faculty", "Cafeteria",
+  "Lab rooms", "Volleyball court", "Basketball court", "Badminton court",
+  "Swimming pool", "Tennis court", "Library", "Study halls",
+  "Student Center", "Common room",
 ];
 
 export default function EventForm() {
   const router = useRouter();
   const { categoryId, categoryLabel, categoryColor, subcategoryLabel, isCustom } =
-    useLocalSearchParams<{
-      categoryId: string; categoryLabel: string; categoryColor: string;
-      subcategoryLabel: string; isCustom: string;
-    }>();
+    useLocalSearchParams<any>();
 
   const [title, setTitle] = useState("");
   const [customActivity, setCustomActivity] = useState("");
@@ -39,17 +37,39 @@ export default function EventForm() {
   const [showDate, setShowDate] = useState(false);
   const [showTime, setShowTime] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const selectedLocation = showCustomInput ? customInsideLocation : insideLocation;
+  const validate = () => {
+    let newErrors: Record<string, string> = {};
 
-  const handlePost = async () => {
     const loc = locationType === "inside"
       ? (showCustomInput ? customInsideLocation : insideLocation)
       : outsideLocation;
 
-    if (!title.trim()) { Alert.alert("Missing Title", "Please give your event a title."); return; }
-    if (!loc.trim()) { Alert.alert("Missing Location", "Please add a location."); return; }
-    if (isCustom === "true" && !customActivity.trim()) { Alert.alert("Missing Activity", "Please describe your activity."); return; }
+    if (!title.trim()) newErrors.title = "Title is required";
+    if (!loc.trim()) newErrors.location = "Location is required";
+    if (isCustom === "true" && !customActivity.trim())
+      newErrors.customActivity = "Activity is required";
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const eventD = new Date(date);
+    eventD.setHours(0, 0, 0, 0);
+
+    if (eventD < today) newErrors.date = "Cannot select past date";
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const selectedLocation = showCustomInput ? customInsideLocation : insideLocation;
+
+  const handlePost = async () => {
+    if (!validate()) return;
+    const loc = locationType === "inside"
+      ? (showCustomInput ? customInsideLocation : insideLocation)
+      : outsideLocation;
 
     setLoading(true);
     try {
@@ -61,6 +81,7 @@ export default function EventForm() {
         customActivity, locationType, location: loc,
         eventDate: date, eventTime: time, peopleNeeded, joinMode,
       });
+
       router.push({
         pathname: "/suggested-participants",
         params: { categoryId, categoryLabel, categoryColor, eventTitle: title, eventId: event.id },
@@ -112,10 +133,11 @@ export default function EventForm() {
             <TextInput
               placeholder="e.g. Avurudu party, debate practice..."
               placeholderTextColor="#2D3E55"
-              style={styles.input}
+              style={[styles.input, customActivity && styles.inputActive]}
               value={customActivity}
               onChangeText={setCustomActivity}
             />
+            {errors.customActivity && <Text style={styles.errorText}>{errors.customActivity}</Text>}
           </>
         )}
 
@@ -128,6 +150,7 @@ export default function EventForm() {
           value={title}
           onChangeText={setTitle}
         />
+        {errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
 
         {/* Location */}
         <Text style={styles.label}>Location</Text>
@@ -136,11 +159,19 @@ export default function EventForm() {
             <TouchableOpacity
               key={type}
               style={[styles.toggleBtn, locationType === type && styles.toggleBtnActive]}
-              onPress={() => setLocationType(type)}
+              onPress={() => {
+                setLocationType(type);
+                if (type === "inside") setShowDropdown(true);
+              }}
             >
-              <MapPin size={13} color={locationType === type ? "#F1F5F9" : "#475569"} strokeWidth={2.5} />
-              <Text style={[styles.toggleBtnText, locationType === type && styles.toggleBtnTextActive]}>
-                {type === "inside" ? "Inside Uni" : "Outside Uni"}
+              <MapPin size={13} color={locationType === type ? "#0F172A" : "#475569"} strokeWidth={2.5} />
+              <Text
+                style={[styles.toggleBtnText, locationType === type && { color: "#0F172A" }]}
+                numberOfLines={1}
+              >
+                {type === "inside"
+                  ? (insideLocation && !showCustomInput ? insideLocation : "Inside Uni")
+                  : "Outside Uni"}
               </Text>
             </TouchableOpacity>
           ))}
@@ -148,25 +179,12 @@ export default function EventForm() {
 
         {locationType === "inside" ? (
           <View>
-            {/* Dropdown trigger */}
-            <TouchableOpacity
-              style={[styles.dropdown, (insideLocation || showCustomInput) && styles.dropdownActive]}
-              onPress={() => setShowDropdown(true)}
-              activeOpacity={0.8}
-            >
-              <MapPin size={15} color="#475569" strokeWidth={2.5} />
-              <Text style={[styles.dropdownText, (insideLocation || showCustomInput) && styles.dropdownTextSelected]}>
-                {showCustomInput ? (customInsideLocation || "Type location...") : (insideLocation || "Select a location")}
-              </Text>
-              <ChevronDown size={16} color="#475569" strokeWidth={2.5} />
-            </TouchableOpacity>
-
             {/* Custom input if "Type my own" selected */}
             {showCustomInput && (
               <TextInput
                 placeholder="e.g. Block C Room 204, Lab 3..."
                 placeholderTextColor="#2D3E55"
-                style={[styles.input, { marginTop: 10 }]}
+                style={[styles.input, { marginBottom: 12 }]}
                 value={customInsideLocation}
                 onChangeText={setCustomInsideLocation}
                 autoFocus
@@ -210,15 +228,19 @@ export default function EventForm() {
                 </View>
               </TouchableOpacity>
             </Modal>
+            {errors.location && <Text style={styles.errorText}>{errors.location}</Text>}
           </View>
         ) : (
-          <TextInput
-            placeholder="e.g. Pizza Hut Malabe, One Galle Face..."
-            placeholderTextColor="#2D3E55"
-            style={[styles.input, outsideLocation && styles.inputActive]}
-            value={outsideLocation}
-            onChangeText={setOutsideLocation}
-          />
+          <View>
+            <TextInput
+              placeholder="e.g. Pizza Hut Malabe, One Galle Face..."
+              placeholderTextColor="#2D3E55"
+              style={[styles.input, outsideLocation && styles.inputActive]}
+              value={outsideLocation}
+              onChangeText={setOutsideLocation}
+            />
+            {errors.location && <Text style={styles.errorText}>{errors.location}</Text>}
+          </View>
         )}
 
         {/* Date & Time */}
@@ -229,10 +251,7 @@ export default function EventForm() {
               <Clock size={13} color="#818CF8" strokeWidth={2.5} />
               <Text style={styles.dtText}>{formatDate(date)}</Text>
             </TouchableOpacity>
-            {showDate && (
-              <DateTimePicker value={date} mode="date" display="default"
-                onChange={(_: any, d?: Date) => { setShowDate(false); if (d) setDate(d); }} />
-            )}
+            {errors.date && <Text style={styles.errorText}>{errors.date}</Text>}
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.label}>Time</Text>
@@ -240,12 +259,51 @@ export default function EventForm() {
               <Clock size={13} color="#818CF8" strokeWidth={2.5} />
               <Text style={styles.dtText}>{formatTime(time)}</Text>
             </TouchableOpacity>
-            {showTime && (
-              <DateTimePicker value={time} mode="time" display="spinner"
-                onChange={(_: any, t?: Date) => { setShowTime(false); if (t) setTime(t); }} />
-            )}
           </View>
         </View>
+
+        {/* Date & Time Modals */}
+        <Modal visible={showDate} transparent animationType="slide">
+          <View style={styles.pickerModalOverlay}>
+            <View style={styles.pickerModalContent}>
+              <View style={styles.pickerHeader}>
+                <TouchableOpacity onPress={() => setShowDate(false)}>
+                  <Text style={styles.pickerCancel}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.pickerTitle}>Select Date</Text>
+                <TouchableOpacity onPress={() => setShowDate(false)}>
+                  <Text style={styles.pickerDone}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={date} mode="date" display="spinner" textColor="#F1F5F9" locale="en_US"
+                onChange={(_: any, d?: Date) => { if (d) setDate(d); }}
+                style={{ alignSelf: 'center', width: '100%' }}
+              />
+            </View>
+          </View>
+        </Modal>
+
+        <Modal visible={showTime} transparent animationType="slide">
+          <View style={styles.pickerModalOverlay}>
+            <View style={styles.pickerModalContent}>
+              <View style={styles.pickerHeader}>
+                <TouchableOpacity onPress={() => setShowTime(false)}>
+                  <Text style={styles.pickerCancel}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.pickerTitle}>Select Time</Text>
+                <TouchableOpacity onPress={() => setShowTime(false)}>
+                  <Text style={styles.pickerDone}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={time} mode="time" display="spinner" is24Hour={false} locale="en_US" textColor="#F1F5F9"
+                onChange={(_: any, t?: Date) => { if (t) setTime(t); }}
+                style={{ alignSelf: 'center', width: '100%' }}
+              />
+            </View>
+          </View>
+        </Modal>
 
         {/* People Needed & Total Spots */}
         <View style={styles.twoCol}>
@@ -321,13 +379,17 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#080E1C" },
   scroll: { flex: 1 },
   content: { paddingHorizontal: 18 },
-  nav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, paddingVertical: 14 },
-  backBtn: { width: 40, height: 40, backgroundColor: "#141B2D", borderRadius: 12, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#1E2A40" },
+  nav: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 18, paddingVertical: 14,
+    backgroundColor: "#141B2D", borderBottomWidth: 1, borderBottomColor: "#1E2A40",
+  },
+  backBtn: { width: 40, height: 40, backgroundColor: "#0F172A", borderRadius: 12, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#1E2A40" },
   navCenter: { alignItems: "center" },
   navStep: { fontSize: 10, fontWeight: "800", color: "#475569", letterSpacing: 1.5 },
   navTitle: { fontSize: 16, fontWeight: "800", color: "#F1F5F9", marginTop: 2 },
 
-  breadRow: { marginTop: 8, marginBottom: 16 },
+  breadRow: { marginTop: 14, marginBottom: 16 },
   breadPill: { alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, backgroundColor: "#141B2D", borderWidth: 1, borderColor: "#1E2A40" },
   breadText: { fontSize: 12, fontWeight: "700", color: "#CBD5E1" },
 
@@ -337,7 +399,7 @@ const styles = StyleSheet.create({
 
   toggleRow: { flexDirection: "row", gap: 10, marginBottom: 12 },
   toggleBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: "#1E2A40", backgroundColor: "#141B2D", gap: 7 },
-  toggleBtnActive: { backgroundColor: "#1E2A40", borderColor: "#2D3E55" },
+  toggleBtnActive: { backgroundColor: "#818CF8", borderColor: "#818CF8" },
   toggleBtnText: { fontSize: 13, fontWeight: "700", color: "#475569" },
   toggleBtnTextActive: { color: "#F1F5F9" },
 
@@ -379,4 +441,13 @@ const styles = StyleSheet.create({
 
   postBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 17, borderRadius: 18, marginTop: 28, gap: 8, backgroundColor: "#818CF8" },
   postBtnText: { fontSize: 17, fontWeight: "900", color: "#0F172A", letterSpacing: 0.2 },
+
+  errorText: { color: "#F87171", fontSize: 12, marginTop: 4, marginLeft: 5 },
+
+  pickerModalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.6)" },
+  pickerModalContent: { backgroundColor: "#141B2D", borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 30 },
+  pickerHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 16, borderBottomWidth: 1, borderBottomColor: "#1E2A40" },
+  pickerCancel: { color: "#94A3B8", fontSize: 16 },
+  pickerTitle: { color: "#F1F5F9", fontSize: 16, fontWeight: "700" },
+  pickerDone: { color: "#818CF8", fontSize: 16, fontWeight: "700" },
 });

@@ -41,6 +41,7 @@ function formatDate(dateStr: string): string {
 export default function Page() {
   const router = useRouter();
   const [activeFilter, setActiveFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -61,9 +62,12 @@ export default function Page() {
   useFocusEffect(useCallback(() => { loadEvents(); }, []));
   const onRefresh = () => { setRefreshing(true); loadEvents(); };
 
-  const filteredEvents = activeFilter === "all"
-    ? events
-    : events.filter((e) => e.category_id === activeFilter);
+  const filteredEvents = events.filter((e) => {
+    const matchesCategory = activeFilter === "all" || e.category_id === activeFilter;
+    const matchesSearch = e.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      e.location?.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -123,6 +127,8 @@ export default function Page() {
               placeholder="Search events, people..."
               placeholderTextColor="#334155"
               style={styles.searchInput}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
             />
           </View>
           <TouchableOpacity style={styles.filterBtn}>
@@ -170,8 +176,8 @@ export default function Page() {
           </View>
         ) : filteredEvents.length === 0 ? (
           <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>No events here yet</Text>
-            <Text style={styles.emptySub}>Be the first to create one!</Text>
+            <Text style={styles.emptyTitle}>{searchQuery ? "No results found" : "No events here yet"}</Text>
+            <Text style={styles.emptySub}>{searchQuery ? "Try adjusting your search or filters" : "Be the first to create one!"}</Text>
           </View>
         ) : (
           filteredEvents.map((event) => (
@@ -200,14 +206,7 @@ export default function Page() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* FAB */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => router.push("/category")}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.fabIcon}>＋</Text>
-      </TouchableOpacity>
+
     </SafeAreaView>
   );
 }
@@ -215,7 +214,7 @@ export default function Page() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#080E1C" },
   scroll: { flex: 1 },
-  content: { paddingHorizontal: 18, paddingTop: 16 },
+  content: { paddingHorizontal: 18, paddingTop: 16, paddingBottom: 100 },
   header: {
     flexDirection: "row", justifyContent: "space-between",
     alignItems: "center", marginBottom: 20,
@@ -280,14 +279,5 @@ const styles = StyleSheet.create({
   empty: { alignItems: "center", paddingVertical: 60 },
   emptyTitle: { fontSize: 16, fontWeight: "800", color: "#334155", marginBottom: 4 },
   emptySub: { fontSize: 13, color: "#1E2A40" },
-  fab: {
-    position: "absolute", bottom: 28, right: 20,
-    backgroundColor: "#818CF8", borderRadius: 20,
-    paddingHorizontal: 20, paddingVertical: 14,
-    flexDirection: "row", alignItems: "center", gap: 8,
-    shadowColor: "#818CF8", shadowOpacity: 0.5,
-    shadowRadius: 20, shadowOffset: { width: 0, height: 6 }, elevation: 12,
-  },
-  fabIcon: { color: "#0F172A", fontSize: 20, fontWeight: "800", lineHeight: 22 },
-  fabLabel: { color: "#0F172A", fontSize: 13, fontWeight: "800", letterSpacing: 1 },
+
 });

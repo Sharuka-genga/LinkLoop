@@ -48,14 +48,7 @@ export async function createEvent(data: {
 export async function getEvents() {
     const { data, error } = await supabase
         .from("events")
-        .select(`
-      *,
-      profiles (
-        id,
-        name,
-        avatar_url
-      )
-    `)
+        .select(`*`)
         .eq("status", "active")
         .order("created_at", { ascending: false });
 

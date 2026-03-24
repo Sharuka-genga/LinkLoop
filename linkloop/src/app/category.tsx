@@ -4,20 +4,20 @@ import {
   StatusBar, Dimensions, FlatList, Image,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { ArrowLeft, ChevronRight, ChevronLeft, ArrowRight, Plus } from "lucide-react-native";
+import { ArrowLeft, ChevronRight, ChevronLeft, Plus } from "lucide-react-native";
 
 const W = Dimensions.get("window").width;
 const H = Dimensions.get("window").height;
 
 const CATEGORIES = [
-  { id: "sports", label: "Sports", color: "#FF6B35", tagline: "Cricket, badminton, football\nand more — find your team", image: require("../../assets/categories/sports.jpeg"), },
-  { id: "study", label: "Study", color: "#818CF8", tagline: "Group sessions, exam prep\nand coding together", image: require("../../assets/categories/study.jpeg"), },
-  { id: "food", label: "Food & Hangouts", color: "#FBBF24", tagline: "Lunch, coffee, dinner\nand bubble tea runs", image: require("../../assets/categories/food.jpeg"), },
-  { id: "fitness", label: "Fitness", color: "#F87171", tagline: "Gym partners, morning runs\nyoga and cycling crew", image: require("../../assets/categories/fitness.jpeg"), },
-  { id: "gaming", label: "Gaming", color: "#34D399", tagline: "FIFA, board games\nLAN parties and more", image: require("../../assets/categories/gaming.jpeg"), },
-  { id: "trips", label: "Trips & Outdoors", color: "#38BDF8", tagline: "Camping, hiking, beach trips\nand photography walks", image: require("../../assets/categories/trips.jpeg"), },
-  { id: "campus", label: "Campus Events", color: "#A78BFA", tagline: "Festivals, musical shows\nworkshops and club events", image: require("../../assets/categories/campus.jpeg"), },
-  { id: "social", label: "Social / Chill", color: "#F472B6", tagline: "Movie nights, campus walks\nand just hanging out", image: require("../../assets/categories/social.jpeg"), },
+  { id: "sports", label: "Sports", color: "#FF6B35", tagline: "Cricket, badminton, football\nand more — find your team", image: require("../../assets/categories/sports.jpeg") },
+  { id: "study", label: "Study", color: "#818CF8", tagline: "Group sessions, exam prep\nand coding together", image: require("../../assets/categories/study.jpeg") },
+  { id: "food", label: "Food & Hangouts", color: "#FBBF24", tagline: "Lunch, coffee, dinner\nand bubble tea runs", image: require("../../assets/categories/food.jpeg") },
+  { id: "fitness", label: "Fitness", color: "#F87171", tagline: "Gym partners, morning runs\nyoga and cycling crew", image: require("../../assets/categories/fitness.jpeg") },
+  { id: "gaming", label: "Gaming", color: "#34D399", tagline: "FIFA, board games\nLAN parties and more", image: require("../../assets/categories/gaming.jpeg") },
+  { id: "trips", label: "Trips & Outdoors", color: "#38BDF8", tagline: "Camping, hiking, beach trips\nand photography walks", image: require("../../assets/categories/trips.jpeg") },
+  { id: "campus", label: "Campus Events", color: "#A78BFA", tagline: "Festivals, musical shows\nworkshops and club events", image: require("../../assets/categories/campus.jpeg") },
+  { id: "social", label: "Social / Chill", color: "#F472B6", tagline: "Movie nights, campus walks\nand just hanging out", image: require("../../assets/categories/social.jpeg") },
 ];
 
 const CUSTOM_CARD = {
@@ -39,8 +39,8 @@ export default function CategorySelect() {
     setActiveIndex(idx);
   };
 
-  const handleSelect = () => {
-    if (isCustom) {
+  const handleSelect = (item: any, isLast: boolean) => {
+    if (isLast) {
       router.push({
         pathname: "/event-form",
         params: {
@@ -52,7 +52,7 @@ export default function CategorySelect() {
     } else {
       router.push({
         pathname: "/subcategory",
-        params: { categoryId: cat.id, categoryLabel: cat.label, categoryColor: cat.color },
+        params: { categoryId: item.id, categoryLabel: item.label, categoryColor: item.color },
       });
     }
   };
@@ -90,7 +90,11 @@ export default function CategorySelect() {
 
           if (isLast) {
             return (
-              <View style={[styles.customCard, { width: W, height: H }]}>
+              <TouchableOpacity
+                style={[styles.customCard, { width: W, height: H }]}
+                onPress={() => handleSelect(item, true)}
+                activeOpacity={0.95}
+              >
                 <View style={styles.customIconWrap}>
                   <View style={styles.customIconRing}>
                     <Plus size={40} color="#94A3B8" strokeWidth={1.5} />
@@ -107,7 +111,7 @@ export default function CategorySelect() {
                 </Text>
                 <View style={styles.customHint}>
                   <Text style={styles.customHintText}>
-                    Skip subcategory and describe your activity in your own words
+                    Tap anywhere to create a custom event
                   </Text>
                 </View>
 
@@ -129,17 +133,20 @@ export default function CategorySelect() {
                   </View>
                 </View>
 
-                {/* Neutral button */}
-                <TouchableOpacity style={styles.selectBtn} onPress={handleSelect} activeOpacity={0.85}>
-                  <Text style={styles.selectBtnText}>Create Custom Event</Text>
-                  <ArrowRight size={18} color="#ffffffff" strokeWidth={2.5} />
-                </TouchableOpacity>
-              </View>
+                {/* Tap hint */}
+                <View style={styles.tapHint}>
+                  <Text style={styles.tapHintText}>TAP CARD TO SELECT</Text>
+                </View>
+              </TouchableOpacity>
             );
           }
 
           return (
-            <View style={{ width: W, height: H }}>
+            <TouchableOpacity
+              style={{ width: W, height: H }}
+              onPress={() => handleSelect(item, false)}
+              activeOpacity={0.95}
+            >
               <Image
                 source={typeof item.image === "string" ? { uri: item.image } : item.image}
                 style={[StyleSheet.absoluteFill, { top: -200 }]}
@@ -150,7 +157,6 @@ export default function CategorySelect() {
                 <Text style={styles.cardCounter}>
                   {String(index + 1).padStart(2, "0")} / {String(ALL_ITEMS.length).padStart(2, "0")}
                 </Text>
-                {/* Accent line — neutral */}
                 <View style={[styles.accentLine, { backgroundColor: "#818CF8" }]} />
                 <Text style={styles.cardLabel}>{item.label}</Text>
                 <Text style={styles.cardTagline}>{item.tagline}</Text>
@@ -181,13 +187,12 @@ export default function CategorySelect() {
                   </View>
                 </View>
 
-                {/* Neutral button — same for all categories */}
-                <TouchableOpacity style={styles.selectBtn} onPress={handleSelect} activeOpacity={0.85}>
-                  <Text style={styles.selectBtnText}>Select {item.label}</Text>
-                  <ArrowRight size={18} color="#fafbfdff" strokeWidth={2.5} />
-                </TouchableOpacity>
+                {/* Tap hint */}
+                <View style={styles.tapHint}>
+                  <Text style={styles.tapHintText}>TAP CARD TO SELECT</Text>
+                </View>
               </View>
-            </View>
+            </TouchableOpacity>
           );
         }}
       />
@@ -248,13 +253,17 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
 
-  // Neutral select button — same for ALL categories
-  selectBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
-    paddingVertical: 17, borderRadius: 18, gap: 10,
-    backgroundColor: "#818CF8",
+  tapHint: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 20, borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
-  selectBtnText: { fontSize: 17, fontWeight: "900", color: "#ffffffff", letterSpacing: 0.2 },
+  tapHintText: {
+    fontSize: 10, fontWeight: "800",
+    color: "rgba(255,255,255,0.5)", letterSpacing: 1.5,
+  },
 
   // Custom card
   customCard: {

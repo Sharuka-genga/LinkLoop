@@ -94,9 +94,6 @@ export default function EventCard({
 
   return (
     <View style={styles.card}>
-      {/* Top accent bar */}
-      <View style={styles.accentBar} />
-
       {/* Top row */}
       <View style={styles.topRow}>
         <View style={[styles.catPill, { backgroundColor: cat.darkColor }]}>
@@ -119,10 +116,6 @@ export default function EventCard({
 
           {isHost && (
             <View style={styles.hostControls}>
-              <View style={styles.yourEventBadge}>
-                <Text style={styles.yourEventText}>YOUR EVENT</Text>
-              </View>
-
               {/* 3-dot button */}
               <View>
                 <TouchableOpacity
@@ -185,8 +178,8 @@ export default function EventCard({
       {/* Info grid */}
       <View style={styles.infoGrid}>
         <View style={styles.infoItem}>
-          <View style={[styles.infoIcon, { backgroundColor: cat.darkColor }]}>
-            <MapPin size={13} color={cat.color} strokeWidth={2.5} />
+          <View style={[styles.infoIcon, { backgroundColor: "rgba(129,140,248,0.15)" }]}>
+            <MapPin size={13} color="#818CF8" strokeWidth={2.5} />
           </View>
           <View style={styles.infoText}>
             <Text style={styles.infoLabel}>LOCATION</Text>
@@ -195,8 +188,8 @@ export default function EventCard({
         </View>
 
         <View style={styles.infoItem}>
-          <View style={[styles.infoIcon, { backgroundColor: cat.darkColor }]}>
-            <Clock size={13} color={cat.color} strokeWidth={2.5} />
+          <View style={[styles.infoIcon, { backgroundColor: "rgba(129,140,248,0.15)" }]}>
+            <Clock size={13} color="#818CF8" strokeWidth={2.5} />
           </View>
           <View style={styles.infoText}>
             <Text style={styles.infoValue}>{date}</Text>
