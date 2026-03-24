@@ -28,6 +28,20 @@
     "plugins": [
       "expo-router",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "LinkLoop needs access to your photos to set your profile picture.",
+          "cameraPermission": "LinkLoop needs camera access to take your profile photo."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "LinkLoop needs your location to share it in emergency SOS alerts.",
+          "locationAlwaysPermission": "LinkLoop needs your location for emergency SOS features."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",

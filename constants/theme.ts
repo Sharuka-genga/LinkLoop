@@ -1,41 +1,89 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+// ── Background Colors ──
+export const BG = {
+  main: '#080E1C',
+  card: '#141B2D',
+  input: '#0F172A',
+  border: '#1E2A40',
+  placeholder: '#2D3E55',
+} as const;
 
+// ── Text Colors ──
+export const TX = {
+  primary: '#F1F5F9',
+  secondary: '#CBD5E1',
+  label: '#475569',
+  subtle: '#334155',
+} as const;
+
+// ── Category Accent Colors ──
+export const Accent = {
+  sports: '#FF6B35',
+  study: '#818CF8',
+  food: '#FBBF24',
+  fitness: '#F87171',
+  gaming: '#34D399',
+  trips: '#38BDF8',
+  campus: '#A78BFA',
+  social: '#F472B6',
+  other: '#94A3B8',
+} as const;
+
+// ── Status Colors ──
+export const Status = {
+  open: '#34D399',
+  byRequest: '#FBBF24',
+  notification: '#F472B6',
+  error: '#F87171',
+} as const;
+
+// ── FAB ──
+export const FAB_COLOR = '#818CF8';
+
+// ── Font Weights ──
+export const FW = {
+  hero: '900' as const,
+  header: '800' as const,
+  cardTitle: '700' as const,
+  body: '600' as const,
+  caption: '500' as const,
+};
+
+// ── Border Radius ──
+export const BR = {
+  card: 24,
+  button: 18,
+  input: 14,
+  smallButton: 12,
+  pill: 20,
+} as const;
+
+// ── Legacy Colors (kept for themed components) ──
 export const Colors = {
   light: {
     text: '#11181C',
     background: '#fff',
-    tint: tintColorLight,
+    tint: '#0a7ea4',
     icon: '#687076',
     tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+    tabIconSelected: '#0a7ea4',
   },
   dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
+    text: TX.primary,
+    background: BG.main,
+    tint: '#fff',
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+    tabIconSelected: '#fff',
   },
 };
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
     sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
     serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: 'ui-monospace',
   },
   default: {
