@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Image, TouchableOpacity, Alert } from "react-na
 import { MapPin, Clock, Users, ChevronRight, Zap, MessageCircle, CheckCircle, Pencil, Trash2 } from "lucide-react-native";
 import { deleteEvent } from "@/lib/events";
 
-const TEST_USER_ID = "00000000-0000-0000-0000-000000000001";
+const TEST_USER_ID = "8d30902c-c3ca-470a-8f4b-b1b545e8f452"; // Kavindu = YOU
 
 type Props = {
   id: string;
@@ -125,7 +125,7 @@ export default function EventCard({
           {isHost && (
             <View style={styles.hostControls}>
               {/* 3-dot button */}
-              <View>
+              <View style={{ position: "relative", zIndex: 1000 }}>
                 <TouchableOpacity
                   style={styles.threeDotBtn}
                   onPress={() => setShowDropdown(!showDropdown)}
@@ -133,18 +133,14 @@ export default function EventCard({
                   <Text style={styles.threeDotText}>•••</Text>
                 </TouchableOpacity>
 
-                {/* Dropdown menu */}
+                {/* Dropdown menu - rendered here to be inside the zIndex container */}
                 {showDropdown && (
                   <View style={styles.dropdown}>
-                    {/* Edit option */}
                     <TouchableOpacity style={styles.dropdownItem} onPress={handleEdit}>
                       <Pencil size={14} color="#CBD5E1" strokeWidth={2.5} />
                       <Text style={styles.dropdownItemText}>Edit Event</Text>
                     </TouchableOpacity>
-
                     <View style={styles.dropdownDivider} />
-
-                    {/* Delete option */}
                     <TouchableOpacity style={styles.dropdownItem} onPress={handleDelete}>
                       <Trash2 size={14} color="#F87171" strokeWidth={2.5} />
                       <Text style={[styles.dropdownItemText, { color: "#F87171" }]}>Delete Event</Text>
@@ -157,10 +153,10 @@ export default function EventCard({
         </View>
       </View>
 
-      {/* Tap outside to close dropdown */}
+      {/* Tap outside to close dropdown - moved here so it can be behind the dropdown z-index if needed */}
       {showDropdown && (
         <TouchableOpacity
-          style={StyleSheet.absoluteFillObject}
+          style={[StyleSheet.absoluteFillObject, { zIndex: 999 }]}
           onPress={() => setShowDropdown(false)}
           activeOpacity={0}
         />
@@ -269,6 +265,7 @@ export default function EventCard({
 
 const styles = StyleSheet.create({
   card: {
+    position: "relative",
     backgroundColor: "#141B2D", borderRadius: 24, padding: 20,
     marginBottom: 16, borderWidth: 1, borderColor: "#1E2A40",
     shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 20,
