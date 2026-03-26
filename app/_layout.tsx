@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { BG } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/context/auth-context';
+import SplashScreen from '@/linkloop/src/components/SplashScreen';
 
 const LinkLoopDark = {
   ...DarkTheme,
@@ -30,6 +31,10 @@ function RootNavigator() {
 
   // Read the onboarding flag from AsyncStorage once on mount
   useEffect(() => {
+    // 🔧 DEV ONLY: Uncomment the line below to reset onboarding on every launch for testing.
+    // Comment it back out before releasing to production!
+    AsyncStorage.removeItem('hasSeenOnboarding'); // 🔧 DEV ONLY — comment out before release!
+
     AsyncStorage.getItem('hasSeenOnboarding').then((value) => {
       setHasSeenOnboarding(value === 'true');
       setOnboardingChecked(true);
@@ -69,11 +74,14 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+  const [showSplash, setShowSplash] = useState(true);
+
   return (
     <AuthProvider>
       <ThemeProvider value={LinkLoopDark}>
         <RootNavigator />
         <StatusBar style="light" />
+        {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
       </ThemeProvider>
     </AuthProvider>
   );
