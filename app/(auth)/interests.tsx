@@ -5,14 +5,14 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 const { width } = Dimensions.get('window');
@@ -67,7 +67,7 @@ const INTEREST_CATEGORIES: InterestCategory[] = [
 ];
 
 export default function InterestsScreen() {
-  const { user, refreshProfile } = useAuth();
+  const { user, signOut } = useAuth();
   const [selected, setSelected] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -92,11 +92,16 @@ export default function InterestsScreen() {
           id: user.id,
           interests: selected,
         });
-      await refreshProfile();
     }
 
     setSaving(false);
-    router.replace('/(tabs)' as any);
+    await signOut();
+    router.replace('/(auth)/login' as any);
+  }
+
+  async function handleSkip() {
+    await signOut();
+    router.replace('/(auth)/login' as any);
   }
 
   return (
@@ -131,6 +136,7 @@ export default function InterestsScreen() {
                       styles.chip,
                       isSelected && { backgroundColor: cat.color, borderColor: cat.color },
                     ]}>
+
                     <Text
                       style={[
                         styles.chipText,
@@ -161,7 +167,7 @@ export default function InterestsScreen() {
 
         <TouchableOpacity
           style={styles.skipBtn}
-          onPress={() => router.replace('/(tabs)' as any)}>
+          onPress={handleSkip}>
           <Text style={styles.skipText}>Skip for now</Text>
         </TouchableOpacity>
       </ScrollView>

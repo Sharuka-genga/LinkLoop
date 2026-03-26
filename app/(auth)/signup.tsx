@@ -1,64 +1,64 @@
-import { BG, BR, FW, TX } from '@/constants/theme';
-import { supabase } from '@/lib/supabase';
-import * as Linking from 'expo-linking';
-import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useState } from 'react';
+import { BG, BR, FW, TX } from "@/constants/theme";
+import { supabase } from "@/lib/supabase";
+import * as Linking from "expo-linking";
+import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    ToastAndroid,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  ToastAndroid,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 function showToast(message: string) {
-  if (Platform.OS === 'android') {
+  if (Platform.OS === "android") {
     ToastAndroid.show(message, ToastAndroid.LONG);
   } else {
-    Alert.alert('Notice', message);
+    Alert.alert("Select your Interests", message);
   }
 }
 
 export default function SignupScreen() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     Linking.getInitialURL().then((url) => {
       if (url) handleDeepLink(url);
     });
-    const sub = Linking.addEventListener('url', (e) => handleDeepLink(e.url));
+    const sub = Linking.addEventListener("url", (e) => handleDeepLink(e.url));
     return () => sub.remove();
   }, []);
 
   async function handleDeepLink(url: string) {
     if (!url) return;
-    const fragment = url.split('#')[1];
+    const fragment = url.split("#")[1];
     if (fragment) {
-      const params = fragment.split('&').reduce(
+      const params = fragment.split("&").reduce(
         (acc, curr) => {
-          const [key, value] = curr.split('=');
+          const [key, value] = curr.split("=");
           acc[key] = value;
           return acc;
         },
         {} as Record<string, string>,
       );
-      if (params['access_token'] && params['refresh_token']) {
-        showToast('Account verified! Please log in.');
-        router.replace('./login' as any);
+      if (params["access_token"] && params["refresh_token"]) {
+        showToast("Account verified! Please log in.");
+        router.replace("./login" as any);
       }
     }
   }
@@ -68,31 +68,31 @@ export default function SignupScreen() {
 
   async function handleSignup() {
     if (!fullName.trim()) {
-      Alert.alert('Error', 'Please enter your full name.');
+      Alert.alert("Error", "Please enter your full name.");
       return;
     }
     if (!email) {
-      Alert.alert('Error', 'Please enter your email.');
+      Alert.alert("Error", "Please enter your email.");
       return;
     }
     if (!isValidSliitEmail(email)) {
       Alert.alert(
-        'Invalid Email',
-        'Use a valid SLIIT student email.\nExample: IT23229952@my.sliit.lk',
+        "Invalid Email",
+        "Use a valid SLIIT student email.\nExample: IT23229952@my.sliit.lk",
       );
       return;
     }
     if (!password || password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters.');
+      Alert.alert("Error", "Password must be at least 6 characters.");
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match.');
+      Alert.alert("Error", "Passwords do not match.");
       return;
     }
 
     setLoading(true);
-    const deepLinkUrl = Linking.createURL('/');
+    const deepLinkUrl = Linking.createURL("/");
 
     const { error } = await supabase.auth.signUp({
       email: email.trim(),
@@ -105,21 +105,23 @@ export default function SignupScreen() {
     setLoading(false);
 
     if (error) {
-      Alert.alert('Sign Up Failed', error.message);
+      Alert.alert("Sign Up Failed", error.message);
     } else {
-      showToast('');
-      router.push('./interests' as any);
+      showToast("");
+      router.push("./interests" as any);
     }
   }
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}>
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.container}
+    >
       <StatusBar style="light" />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.hero}>
           <Text style={styles.logo}>LinkLoop</Text>
           <Text style={styles.tagline}>Create your campus identity</Text>
@@ -184,7 +186,8 @@ export default function SignupScreen() {
             style={styles.button}
             onPress={handleSignup}
             activeOpacity={0.8}
-            disabled={loading}>
+            disabled={loading}
+          >
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
@@ -194,9 +197,10 @@ export default function SignupScreen() {
 
           <TouchableOpacity
             style={styles.toggleBtn}
-            onPress={() => router.push('./login' as any)}>
+            onPress={() => router.push("./login" as any)}
+          >
             <Text style={styles.toggleText}>
-              Already have an account?{' '}
+              Already have an account?{" "}
               <Text style={styles.toggleHighlight}>Sign In</Text>
             </Text>
           </TouchableOpacity>
@@ -210,16 +214,16 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG.main },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
     paddingVertical: 60,
   },
-  hero: { alignItems: 'center', marginBottom: 32 },
+  hero: { alignItems: "center", marginBottom: 32 },
   logo: {
     fontSize: 42,
     fontWeight: FW.hero,
-    color: '#818CF8',
+    color: "#818CF8",
     letterSpacing: 2,
   },
   tagline: {
@@ -255,7 +259,7 @@ const styles = StyleSheet.create({
     fontWeight: FW.body,
     color: TX.label,
     marginBottom: 6,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     letterSpacing: 0.8,
   },
   input: {
@@ -269,23 +273,23 @@ const styles = StyleSheet.create({
     borderColor: BG.border,
   },
   button: {
-    backgroundColor: '#818CF8',
+    backgroundColor: "#818CF8",
     paddingVertical: 16,
     borderRadius: BR.button,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 8,
   },
   buttonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 17,
     fontWeight: FW.header,
     letterSpacing: 0.5,
   },
-  toggleBtn: { marginTop: 20, alignItems: 'center' },
+  toggleBtn: { marginTop: 20, alignItems: "center" },
   toggleText: {
     color: TX.secondary,
     fontSize: 14,
     fontWeight: FW.body,
   },
-  toggleHighlight: { color: '#818CF8' },
+  toggleHighlight: { color: "#818CF8" },
 });
