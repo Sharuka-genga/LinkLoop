@@ -91,7 +91,7 @@ export default function Page() {
         <View style={styles.header}>
           <View>
             <Text style={styles.greetingSmall}>GOOD DAY</Text>
-            <Text style={styles.greeting}>Hey, Dinuka </Text>
+            <Text style={styles.greeting}>Hey, Kavindu </Text>
           </View>
           <View style={styles.headerRight}>
             <TouchableOpacity style={styles.notifBtn}>
@@ -202,7 +202,7 @@ export default function Page() {
               creatorId={event.creator_id}
               creatorName={event.creatorName || "Unknown"}
               creatorAvatar={
-                event.creatorAvatar || "https://i.pravatar.cc/80?img=1"
+                event.creatorAvatar || (event.creator_id === "8d30902c-c3ca-470a-8f4b-b1b545e8f452" ? "https://i.pravatar.cc/150?img=12" : "https://i.pravatar.cc/150?u=diverse")
               }
               joinMode={event.join_mode}
               spotsLeft={event.people_needed}

@@ -142,7 +142,7 @@ export default function SubcategorySelect() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
 
       {/* Header photo */}
@@ -248,7 +248,7 @@ export default function SubcategorySelect() {
           {selected && <ChevronRight size={18} color="#0F172A" strokeWidth={3} />}
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -257,7 +257,7 @@ const RING_SIZE = 120 * 2 + 80 + 30;
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#080E1C" },
 
-  header: { height: 240, position: "relative" },
+  header: { height: 280, position: "relative" },
   headerOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)" },
   headerFade: {
     position: "absolute", bottom: 0, left: 0, right: 0, height: 80,
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
   },
   nav: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 18, paddingTop: 14,
+    paddingHorizontal: 18, paddingTop: 60,
   },
   navBtn: {
     width: 40, height: 40, backgroundColor: "rgba(0,0,0,0.5)",

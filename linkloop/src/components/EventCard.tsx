@@ -166,8 +166,8 @@ export default function EventCard({
       {creatorName && (
         <View style={styles.creatorRow}>
           <Image
-            source={{ uri: creatorAvatar || `https://i.pravatar.cc/80?u=${creatorName}` }}
-            style={[styles.avatar, { borderColor: cat.color }]}
+            source={{ uri: creatorAvatar || (creatorId === TEST_USER_ID ? "https://i.pravatar.cc/150?img=12" : `https://i.pravatar.cc/150?u=${creatorId}`) }}
+            style={styles.avatar}
           />
           <Text style={styles.creatorName}>{creatorName}</Text>
           <Text style={styles.hostLabel}>{isHost ? "YOU" : "HOST"}</Text>
@@ -307,11 +307,10 @@ const styles = StyleSheet.create({
   },
   yourEventText: { fontSize: 9, fontWeight: "800", color: "#818CF8", letterSpacing: 1 },
   threeDotBtn: {
-    width: 32, height: 32, borderRadius: 9,
-    backgroundColor: "#1E2A40", borderWidth: 1, borderColor: "#2D3E55",
+    padding: 8, marginRight: -8,
     alignItems: "center", justifyContent: "center",
   },
-  threeDotText: { fontSize: 14, color: "#64748B", letterSpacing: 1, lineHeight: 16 },
+  threeDotText: { fontSize: 18, color: "rgba(148,163,184,0.6)", letterSpacing: 1.5, fontWeight: "900" },
 
   // Dropdown
   dropdown: {

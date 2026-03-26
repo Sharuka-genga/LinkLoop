@@ -23,18 +23,17 @@ type User = {
 
 // ─── Mock Users ───────────────────────────────────────────────────────────────
 const ALL_USERS: User[] = [
-  { id: "1", name: "Kasun Silva", avatar: "https://i.pravatar.cc/150?img=8", interests: ["sports", "fitness"], rating: 4.8, eventsJoined: ["sports", "fitness", "gaming"], lastActiveDaysAgo: 0, faculty: "Engineering", year: "3rd" },
-  { id: "2", name: "Amaya Fernando", avatar: "https://i.pravatar.cc/150?img=5", interests: ["study", "campus"], rating: 4.6, eventsJoined: ["study", "campus", "social"], lastActiveDaysAgo: 2, faculty: "IT", year: "2nd" },
-  { id: "3", name: "Ravi Jayawardena", avatar: "https://i.pravatar.cc/150?img=15", interests: ["sports", "gaming"], rating: 4.7, eventsJoined: ["sports", "gaming"], lastActiveDaysAgo: 0, faculty: "Engineering", year: "4th" },
-  { id: "4", name: "Sachini Perera", avatar: "https://i.pravatar.cc/150?img=20", interests: ["fitness", "social"], rating: 4.5, eventsJoined: ["fitness", "trips", "social"], lastActiveDaysAgo: 3, faculty: "Business", year: "3rd" },
-  { id: "5", name: "Dineth Madusanka", avatar: "https://i.pravatar.cc/150?img=11", interests: ["gaming", "social"], rating: 4.3, eventsJoined: ["gaming", "social"], lastActiveDaysAgo: 5, faculty: "IT", year: "2nd" },
-  { id: "6", name: "Thilini Rajapaksa", avatar: "https://i.pravatar.cc/150?img=47", interests: ["study", "campus", "trips"], rating: 4.9, eventsJoined: ["study", "campus", "trips"], lastActiveDaysAgo: 1, faculty: "Engineering", year: "4th" },
-  { id: "7", name: "Malith Herath", avatar: "https://i.pravatar.cc/150?img=33", interests: ["sports", "trips"], rating: 4.4, eventsJoined: ["sports", "trips"], lastActiveDaysAgo: 6, faculty: "IT", year: "1st" },
-  { id: "8", name: "Nimesha W.", avatar: "https://i.pravatar.cc/150?img=44", interests: ["food", "social", "campus"], rating: 4.7, eventsJoined: ["food", "social", "campus"], lastActiveDaysAgo: 2, faculty: "Business", year: "3rd" },
-  { id: "9", name: "Chamara Bandara", avatar: "https://i.pravatar.cc/150?img=53", interests: ["sports", "fitness"], rating: 4.6, eventsJoined: ["sports", "fitness"], lastActiveDaysAgo: 0, faculty: "Engineering", year: "2nd" },
-  { id: "10", name: "Isuri Senanayake", avatar: "https://i.pravatar.cc/150?img=49", interests: ["campus", "study", "social"], rating: 4.8, eventsJoined: ["campus", "study"], lastActiveDaysAgo: 1, faculty: "Business", year: "4th" },
-  { id: "11", name: "Tharindu Peris", avatar: "https://i.pravatar.cc/150?img=60", interests: ["gaming", "trips"], rating: 4.2, eventsJoined: ["gaming", "trips", "social"], lastActiveDaysAgo: 4, faculty: "IT", year: "3rd" },
-  { id: "12", name: "Dulani Wijeratne", avatar: "https://i.pravatar.cc/150?img=41", interests: ["fitness", "food", "social"], rating: 4.5, eventsJoined: ["fitness", "food"], lastActiveDaysAgo: 2, faculty: "Business", year: "2nd" },
+  { id: "1", name: "Kasun Silva", avatar: "https://i.pravatar.cc/150?img=68", interests: ["sports", "fitness"], rating: 4.8, eventsJoined: ["sports", "fitness", "gaming"], lastActiveDaysAgo: 0, faculty: "Engineering", year: "3rd" },
+  { id: "2", name: "Amaya Fernando", avatar: "https://i.pravatar.cc/150?img=41", interests: ["study", "campus"], rating: 4.6, eventsJoined: ["study", "campus", "social"], lastActiveDaysAgo: 2, faculty: "IT", year: "2nd" },
+  { id: "3", name: "Ravi Jayawardena", avatar: "https://i.pravatar.cc/150?img=11", interests: ["sports", "gaming"], rating: 4.7, eventsJoined: ["sports", "gaming"], lastActiveDaysAgo: 0, faculty: "Engineering", year: "4th" },
+  { id: "5", name: "Dineth Madusanka", avatar: "https://i.pravatar.cc/150?img=14", interests: ["gaming", "social"], rating: 4.3, eventsJoined: ["gaming", "social"], lastActiveDaysAgo: 5, faculty: "IT", year: "2nd" },
+  { id: "6", name: "Thilini Rajapaksa", avatar: "https://i.pravatar.cc/150?img=44", interests: ["study", "campus", "trips"], rating: 4.9, eventsJoined: ["study", "campus", "trips"], lastActiveDaysAgo: 1, faculty: "Engineering", year: "4th" },
+  { id: "7", name: "Malith Herath", avatar: "https://i.pravatar.cc/150?img=52", interests: ["sports", "trips"], rating: 4.4, eventsJoined: ["sports", "trips"], lastActiveDaysAgo: 6, faculty: "IT", year: "1st" },
+  { id: "8", name: "Nimesha W.", avatar: "https://i.pravatar.cc/150?img=49", interests: ["food", "social", "campus"], rating: 4.7, eventsJoined: ["food", "social", "campus"], lastActiveDaysAgo: 2, faculty: "Business", year: "3rd" },
+  { id: "9", name: "Chamara Bandara", avatar: "https://i.pravatar.cc/150?img=18", interests: ["sports", "fitness"], rating: 4.6, eventsJoined: ["sports", "fitness"], lastActiveDaysAgo: 0, faculty: "Engineering", year: "2nd" },
+  { id: "10", name: "Isuri Senanayake", avatar: "https://i.pravatar.cc/150?img=48", interests: ["campus", "study", "social"], rating: 4.8, eventsJoined: ["campus", "study"], lastActiveDaysAgo: 1, faculty: "Business", year: "4th" },
+  { id: "11", name: "Tharindu Peris", avatar: "https://i.pravatar.cc/150?img=51", interests: ["gaming", "trips"], rating: 4.2, eventsJoined: ["gaming", "trips", "social"], lastActiveDaysAgo: 4, faculty: "IT", year: "3rd" },
+  { id: "12", name: "Dulani Wijeratne", avatar: "https://i.pravatar.cc/150?img=45", interests: ["fitness", "food", "social"], rating: 4.5, eventsJoined: ["fitness", "food"], lastActiveDaysAgo: 2, faculty: "Business", year: "2nd" },
 ];
 
 function scoreUser(user: User, categoryId: string): number {
