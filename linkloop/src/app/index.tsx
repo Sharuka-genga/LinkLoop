@@ -169,6 +169,8 @@ export default function Page() {
           </TouchableOpacity>
         </View>
 
+    
+
         {/* Events */}
         {loading ? (
           <View style={styles.empty}>
