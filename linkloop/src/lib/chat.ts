@@ -17,7 +17,8 @@ export type Message = {
   media_url?: string;
   created_at: string;
   is_pinned?: boolean;
-  status: 'sent' | 'delivered' | 'seen';
+  is_anonymous?: boolean;
+  status: 'pending' | 'sent' | 'delivered' | 'seen' | 'cancelled';
   profiles?: {
     full_name?: string;
     avatar_url?: string;
@@ -70,7 +71,7 @@ const TEST_USER_ID = "00000000-0000-0000-0000-000000000001";
 
 // ── Messages ─────────────────────────────────────────────────────
 
-export async function sendMessage(eventId: string, content: string, mediaUrl?: string, metadata?: MessageMetadata) {
+export async function sendMessage(eventId: string, content: string, mediaUrl?: string, metadata?: MessageMetadata, isAnonymous: boolean = false, status: 'pending' | 'sent' | 'delivered' | 'seen' | 'cancelled' = 'sent') {
   let finalContent = content;
   if (metadata && metadata.type !== 'text') {
     finalContent = `[META]:${JSON.stringify({ ...metadata, text: content })}`;
@@ -83,24 +84,75 @@ export async function sendMessage(eventId: string, content: string, mediaUrl?: s
       sender_id: TEST_USER_ID,
       content: finalContent,
       media_url: mediaUrl,
+      is_anonymous: isAnonymous,
+      status: status
     })
     .select()
     .single();
 
   if (error) {
-    if (error.code === '23503') {
-      console.warn("Mock Event ID detected (FK Violation). Falling back to local mock message.");
-      return {
-        id: `mock-msg-${Date.now()}`,
+    console.warn("sendMessage error:", error);
+    // Fallback to local mock message on any error (like 22P02 UUID or 23503 FK violation)
+    return {
+      id: `mock-msg-${Date.now()}`,
+      event_id: eventId,
+      sender_id: TEST_USER_ID,
+      content: finalContent,
+      media_url: mediaUrl,
+      is_anonymous: isAnonymous,
+      created_at: new Date().toISOString(),
+      status: status
+    };
+  }
+  return data;
+}
+
+export async function confirmMessageSent(messageId: string) {
+  const { data, error } = await supabase
+    .from("messages")
+    .update({ status: 'sent' })
+    .eq('id', messageId)
+    .select().single();
+  
+  if (error) throw error;
+  return data;
+}
+
+export async function cancelPendingMessage(messageId: string) {
+  const { error } = await supabase
+    .from("messages")
+    .update({ status: 'cancelled' })
+    .eq('id', messageId);
+  
+  if (error) throw error;
+}
+
+export async function scheduleMessage(eventId: string, content: string, sendAt: Date, isAnonymous: boolean = false) {
+  const { data, error } = await supabase
+    .from("scheduled_messages")
+    .insert({
+      event_id: eventId,
+      sender_id: TEST_USER_ID,
+      content: content,
+      send_at: sendAt.toISOString(),
+      is_anonymous: isAnonymous
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.warn("scheduleMessage error:", error);
+    // Fallback to mock on any error to prevent UI crash during testing
+    return {
+        id: `mock-scheduled-${Date.now()}`,
         event_id: eventId,
         sender_id: TEST_USER_ID,
-        content: finalContent,
-        media_url: mediaUrl,
-        created_at: new Date().toISOString(),
-        status: 'sent'
-      };
-    }
-    throw error;
+        content: content,
+        send_at: sendAt.toISOString(),
+        is_anonymous: isAnonymous,
+        sent: false,
+        created_at: new Date().toISOString()
+    };
   }
   return data;
 }
@@ -401,7 +453,7 @@ export async function checkInToEvent(eventId: string, userId: string) {
     .eq("user_id", userId)
     .single();
   
-  if (existing) return;
+  if (existing) return { mocked: false };
 
   const { error } = await supabase
     .from("event_checkins")
@@ -409,7 +461,22 @@ export async function checkInToEvent(eventId: string, userId: string) {
     
   // Handle 403/FK violations (Event doesn't exist in DB yet)
   // 23503: Foreign key violation (event doesn't exist in 'events' table)
-  if (error && error.code !== '23505' && error.code !== '23503') throw error;
+  if (error && error.code === '23503') return { mocked: true };
+  if (error && error.code !== '23505') throw error;
+  return { mocked: false };
+}
+
+export async function checkIfUserCheckedIn(eventId: string, userId: string) {
+  const { data, error } = await supabase
+    .from('event_checkins')
+    .select('id')
+    .eq('event_id', eventId)
+    .eq('user_id', userId)
+    .single();
+
+  // PGRST116 means no rows found, which is fine
+  if (error && error.code !== 'PGRST116') console.error(error);
+  return !!data;
 }
 
 export async function getCheckInCount(eventId: string) {

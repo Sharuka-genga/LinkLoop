@@ -18,9 +18,11 @@ import {
   deleteMessageForEveryone, trackPresence, broadcastTyping, PresenceState,
   pinMessage, checkInToEvent, getCheckInCount, getEventSummary,
   parseMessageContent, MessageMetadata, logScreenshot, uploadChatMedia, requestMediaAccess,
-  updateUserStatus, updateTypingStatus, subscribeToTypingStatus, TypingStatus
+  updateUserStatus, updateTypingStatus, subscribeToTypingStatus, TypingStatus,
+  cancelPendingMessage, confirmMessageSent, scheduleMessage, checkIfUserCheckedIn
 } from "@/lib/chat";
-import { Pin, CheckCircle2, AlertTriangle, Info, EyeOff, Lock, ShieldAlert, DownloadCloud } from "lucide-react-native";
+import { Pin, CheckCircle2, AlertTriangle, Info, EyeOff, Lock, ShieldAlert, DownloadCloud, UserMinus, Calendar } from "lucide-react-native";
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { supabase } from "@/lib/supabase";
 
 const TEST_USER_ID = "00000000-0000-0000-0000-000000000001";
@@ -41,6 +43,12 @@ export default function ChatScreen() {
   const [deletedMessageIds, setDeletedMessageIds] = useState<string[]>([]);
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(true);
+  
+  // Advanced Features State (Anonymous, Schedule, Undo)
+  const [isAnonymousMode, setIsAnonymousMode] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState<Date | null>(null);
+  const [isDatePickerVisible, setDatePickerVisible] = useState(false);
+  const [pendingMessages, setPendingMessages] = useState<Record<string, any>>({});
   
   // Poll State
   const [isPollModalVisible, setPollModalVisible] = useState(false);
@@ -96,7 +104,13 @@ export default function ChatScreen() {
 
     const msgSub = subscribeToMessages(eventId, (newMessage, eventType) => {
       if (eventType === 'INSERT') {
-        setMessages((prev) => [...prev, { ...newMessage, status: 'delivered' }]);
+        setMessages((prev) => {
+          if (prev.some(m => m.id === newMessage.id)) {
+            // Already added optimistically, just update status
+            return prev.map(m => m.id === newMessage.id ? { ...newMessage, status: 'delivered' } : m);
+          }
+          return [...prev, { ...newMessage, status: 'delivered' }];
+        });
         setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
       } else if (eventType === 'UPDATE') {
         setMessages((prev) => prev.map(m => m.id === newMessage.id ? newMessage : m));
@@ -237,6 +251,8 @@ export default function ChatScreen() {
   const fetchCheckInCount = async () => {
     const count = await getCheckInCount(eventId!);
     setCheckInCount(count);
+    const isCheckedIn = await checkIfUserCheckedIn(eventId!, TEST_USER_ID);
+    if (isCheckedIn) setHasArrived(true);
   };
 
   const handleTyping = () => {
@@ -364,15 +380,70 @@ export default function ChatScreen() {
     setInputText("");
     
     try {
-      const msg = await sendMessage(eventId!, text);
-      // If it's a mock message from a foreign key fallback, append locally
-      if (msg && msg.id && msg.id.startsWith('mock-')) {
+      if (scheduledDate) {
+         await scheduleMessage(eventId!, text, scheduledDate, isAnonymousMode);
+         Alert.alert("Scheduled", `Message scheduled for ${scheduledDate.toLocaleTimeString()}`);
+         
+         const delay = Math.max(0, scheduledDate.getTime() - Date.now());
+          setTimeout(async () => {
+             try {
+                // Simulate the backend cron job / edge function processing the scheduled message
+                const msg = await sendMessage(eventId!, text, undefined, undefined, isAnonymousMode, 'sent');
+                if (msg) {
+                   setMessages(prev => {
+                      if (prev.some(m => m.id === msg.id)) return prev;
+                      return [...prev, msg];
+                   });
+                   setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+                }
+             } catch (e) {
+                console.error("Failed to send scheduled message automatically", e);
+             }
+         }, delay);
+
+         setScheduledDate(null);
+         return;
+      }
+
+      const msg = await sendMessage(eventId!, text, undefined, undefined, isAnonymousMode, 'pending');
+      if (msg) {
         setMessages(prev => [...prev, msg]);
         setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+
+        const timer = setTimeout(async () => {
+          try {
+             await confirmMessageSent(msg.id);
+             setPendingMessages(prev => {
+               const next = {...prev};
+               delete next[msg.id];
+               return next;
+             });
+             setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, status: 'sent' } : m));
+          } catch(e) {
+             console.error("Failed to confirm message", e);
+          }
+        }, 10000); // 10s
+        
+        setPendingMessages(prev => ({ ...prev, [msg.id]: timer }));
       }
     } catch (error) {
       Alert.alert("Error", "Failed to send message.");
       setInputText(text);
+    }
+  };
+
+  const handleUndoMessage = async (messageId: string) => {
+    if (pendingMessages[messageId]) {
+      clearTimeout(pendingMessages[messageId]);
+      await cancelPendingMessage(messageId);
+      
+      setPendingMessages(prev => {
+        const next = {...prev};
+        delete next[messageId];
+        return next;
+      });
+      
+      setMessages(prev => prev.filter(m => m.id !== messageId));
     }
   };
 
@@ -390,10 +461,16 @@ export default function ChatScreen() {
 
   const handleArrived = async () => {
     try {
-      await checkInToEvent(eventId!, TEST_USER_ID);
       setHasArrived(true);
-      fetchCheckInCount();
+      const res = await checkInToEvent(eventId!, TEST_USER_ID);
+      
+      if (res?.mocked) {
+         setCheckInCount(prev => prev + 1);
+      } else {
+         fetchCheckInCount();
+      }
     } catch (error) {
+      setHasArrived(false);
       Alert.alert("Error", "Failed to check in.");
     }
   };
@@ -724,7 +801,7 @@ export default function ChatScreen() {
             <View style={styles.avatarSpace}>
               {isFirstInGroup && (
                 <RNImage 
-                  source={{ uri: item.profiles?.avatar_url || `https://i.pravatar.cc/80?u=${item.sender_id}` }} 
+                  source={{ uri: item.is_anonymous ? 'https://ui-avatars.com/api/?name=Anonymous&background=random' : (item.profiles?.avatar_url || `https://i.pravatar.cc/80?u=${item.sender_id}`) }} 
                   style={styles.avatar} 
                 />
               )}
@@ -735,10 +812,11 @@ export default function ChatScreen() {
             isMe ? styles.myBubble : styles.theirBubble,
             isDeletedGlobally && styles.deletedBubble,
             !isFirstInGroup && isMe && styles.myBubbleContinued,
-            !isFirstInGroup && !isMe && styles.theirBubbleContinued
+            !isFirstInGroup && !isMe && styles.theirBubbleContinued,
+            item.status === 'pending' && { opacity: 0.7 }
           ]}>
             {!isMe && !isDeletedGlobally && isFirstInGroup && (
-              <Text style={styles.senderName}>{item.profiles?.full_name || "Participant"}</Text>
+              <Text style={styles.senderName}>{item.is_anonymous ? "🕶️ Anonymous" : (item.profiles?.full_name || "Participant")}</Text>
             )}
             
             {/* Privacy Badges */}
@@ -831,18 +909,29 @@ export default function ChatScreen() {
               </Text>
               ) : null}
               <View style={styles.messageFooter}>
-                <Text style={[styles.timestamp, isMe ? styles.myTime : styles.theirTime]}>
-                  {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-                {isMe && (
-                  <View style={styles.ticksContainer}>
-                    <Text style={[
-                      styles.tick, 
-                      item.status === 'seen' ? styles.seenTick : styles.deliveredTick
-                    ]}>
-                      {item.status === 'sent' ? '✓' : '✓✓'}
-                    </Text>
+                {item.status === 'pending' && isMe ? (
+                  <View style={styles.undoContainer}>
+                    <Text style={styles.pendingText}>⏳ Sending in 10s...</Text>
+                    <TouchableOpacity onPress={() => handleUndoMessage(item.id)}>
+                       <Text style={styles.undoText}>UNDO</Text>
+                    </TouchableOpacity>
                   </View>
+                ) : (
+                  <>
+                    <Text style={[styles.timestamp, isMe ? styles.myTime : styles.theirTime]}>
+                      {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                    {isMe && (
+                      <View style={styles.ticksContainer}>
+                        <Text style={[
+                          styles.tick, 
+                          item.status === 'seen' ? styles.seenTick : styles.deliveredTick
+                        ]}>
+                          {item.status === 'sent' ? '✓' : '✓✓'}
+                        </Text>
+                      </View>
+                    )}
+                  </>
                 )}
               </View>
             </View>
@@ -1090,6 +1179,46 @@ export default function ChatScreen() {
         )}
 
         <View style={styles.inputArea}>
+          {/* Advanced Features Toggles */}
+          <View style={styles.advancedFeaturesRow}>
+             <TouchableOpacity 
+               style={[styles.featureToggle, isAnonymousMode && styles.featureToggleActive]}
+               onPress={() => setIsAnonymousMode(!isAnonymousMode)}
+             >
+               <UserMinus size={14} color={isAnonymousMode ? "#FFF" : "#94A3B8"} />
+               <Text style={[styles.featureToggleText, isAnonymousMode && styles.featureToggleTextActive]}>
+                 Anonymous: {isAnonymousMode ? "ON" : "OFF"}
+               </Text>
+             </TouchableOpacity>
+
+             <TouchableOpacity 
+               style={[styles.featureToggle, scheduledDate && styles.featureToggleActive]}
+               onPress={() => setDatePickerVisible(true)}
+             >
+               <Calendar size={14} color={scheduledDate ? "#FFF" : "#94A3B8"} />
+               <Text style={[styles.featureToggleText, scheduledDate && styles.featureToggleTextActive]}>
+                 {scheduledDate ? scheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Schedule"}
+               </Text>
+               {scheduledDate && (
+                 <TouchableOpacity onPress={() => setScheduledDate(null)} style={{ marginLeft: 4 }}>
+                   <X size={12} color="#FFF" />
+                 </TouchableOpacity>
+               )}
+             </TouchableOpacity>
+          </View>
+
+          {isDatePickerVisible && (
+            <DateTimePicker
+              value={scheduledDate || new Date()}
+              mode="time"
+              display="default"
+              onChange={(event, date) => {
+                setDatePickerVisible(false);
+                if (date) setScheduledDate(date);
+              }}
+            />
+          )}
+
           {uploadProgress && (
             <View style={styles.uploadProgressContainer}>
               <ActivityIndicator color="#818CF8" size="small" style={{ marginRight: 8 }} />
@@ -1534,4 +1663,16 @@ const styles = StyleSheet.create({
 
   screenshotWarning: { position: 'absolute', top: 80, left: 20, right: 20, backgroundColor: '#EF4444', padding: 12, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 1000, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 10 },
   screenshotWarningText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+  
+  // Undo Message Timer
+  undoContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginTop: 4, width: '100%' },
+  pendingText: { color: '#FCD34D', fontSize: 11, fontWeight: '600', fontStyle: 'italic' },
+  undoText: { color: '#EF4444', fontSize: 11, fontWeight: '800', backgroundColor: 'rgba(239, 68, 68, 0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+
+  // Advanced Features Toggles
+  advancedFeaturesRow: { flexDirection: 'row', gap: 8, marginBottom: 12, paddingHorizontal: 8 },
+  featureToggle: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, gap: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  featureToggleActive: { backgroundColor: 'rgba(129, 140, 248, 0.2)', borderColor: 'rgba(129, 140, 248, 0.4)' },
+  featureToggleText: { color: '#94A3B8', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
+  featureToggleTextActive: { color: '#FFF' },
 });
