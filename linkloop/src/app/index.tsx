@@ -88,7 +88,7 @@ export default function Page() {
             <Text style={styles.greeting}>Hey, Dinuka </Text>
           </View>
           <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.notifBtn}>
+            <TouchableOpacity style={styles.notifBtn} onPress={() => router.push("/notifications")}>
               <Bell size={20} color="#CBD5E1" strokeWidth={2} />
               <View style={styles.notifDot} />
             </TouchableOpacity>
