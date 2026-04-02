@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef } from "react";
 import { 
   View, Text, StyleSheet, FlatList, TouchableOpacity, 
-  TextInput, KeyboardAvoidingView, Platform, SafeAreaView, 
+  TextInput, KeyboardAvoidingView, Platform, 
   Image as RNImage, ActivityIndicator, Alert, Modal, AppState
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { 
   Send, ChevronLeft, Paperclip, BarChart2, MoreVertical, 
   Clock, MapPin, X, Trash2, Camera
@@ -412,7 +413,11 @@ export default function ChatScreen() {
 
         const timer = setTimeout(async () => {
           try {
-             await confirmMessageSent(msg.id);
+             // Skip database confirmation for mock messages (FK violation fallback)
+             if (!msg.id.startsWith('mock-')) {
+                await confirmMessageSent(msg.id);
+             }
+             
              setPendingMessages(prev => {
                const next = {...prev};
                delete next[msg.id];
@@ -433,22 +438,35 @@ export default function ChatScreen() {
   };
 
   const handleUndoMessage = async (messageId: string) => {
+    // 1. Clear the timer immediately so it doesn't confirm the message
     if (pendingMessages[messageId]) {
       clearTimeout(pendingMessages[messageId]);
+    }
+    
+    // 2. Optimistic UI: remove from local state immediately
+    setPendingMessages(prev => {
+      const next = {...prev};
+      delete next[messageId];
+      return next;
+    });
+    setMessages(prev => prev.filter(m => m.id !== messageId));
+
+    // 3. Inform backend in background (don't block UI)
+    try {
       await cancelPendingMessage(messageId);
-      
-      setPendingMessages(prev => {
-        const next = {...prev};
-        delete next[messageId];
-        return next;
-      });
-      
-      setMessages(prev => prev.filter(m => m.id !== messageId));
+    } catch (e) {
+      console.warn("Undo: Failed to cancel in backend", e);
     }
   };
 
   const handlePin = async () => {
     if (!selectedMessage) return;
+    if (selectedMessage.id.startsWith('mock-')) {
+      Alert.alert("Note", "This is a mock message and cannot be pinned to the database.");
+      setDeleteModalVisible(false);
+      setSelectedMessage(null);
+      return;
+    }
     try {
       await pinMessage(selectedMessage.id, !selectedMessage.is_pinned);
       setDeleteModalVisible(false);
@@ -492,6 +510,12 @@ export default function ChatScreen() {
 
   const handleDeleteForEveryone = async () => {
     if (!selectedMessage) return;
+    if (selectedMessage.id.startsWith('mock-')) {
+      Alert.alert("Note", "This is a mock message and cannot be deleted from the database.");
+      setDeleteModalVisible(false);
+      setSelectedMessage(null);
+      return;
+    }
     try {
       await deleteMessageForEveryone(selectedMessage.id);
       setDeleteModalVisible(false);
@@ -616,6 +640,10 @@ export default function ChatScreen() {
   };
 
   const handleRequestAccess = async (mediaId: string) => {
+    if (mediaId.startsWith('mock-')) {
+      Alert.alert("Note", "Cannot request access to mock media.");
+      return;
+    }
     try {
         await requestMediaAccess(mediaId);
         Alert.alert("Request Sent", "The media owner will review your access request.");
@@ -768,7 +796,17 @@ export default function ChatScreen() {
             {!isMe && (
               <View style={styles.avatarSpace}>
                 {isFirstInGroup && (
-                  <RNImage source={{ uri: `https://i.pravatar.cc/80?u=${item.sender_id}` }} style={styles.avatar} />
+                  <View style={[
+                    styles.avatarContainer,
+                    presenceState[item.sender_id]?.status === 'active' ? styles.avatarActive :
+                    presenceState[item.sender_id]?.status === 'idle' ? styles.avatarIdle :
+                    styles.avatarOffline
+                  ]}>
+                    <RNImage 
+                      source={{ uri: item.is_anonymous ? 'https://ui-avatars.com/api/?name=Anonymous&background=random' : (item.profiles?.avatar_url || `https://i.pravatar.cc/80?u=${item.sender_id}`) }} 
+                      style={styles.avatar} 
+                    />
+                  </View>
                 )}
               </View>
             )}
@@ -800,10 +838,17 @@ export default function ChatScreen() {
           {!isMe && (
             <View style={styles.avatarSpace}>
               {isFirstInGroup && (
-                <RNImage 
-                  source={{ uri: item.is_anonymous ? 'https://ui-avatars.com/api/?name=Anonymous&background=random' : (item.profiles?.avatar_url || `https://i.pravatar.cc/80?u=${item.sender_id}`) }} 
-                  style={styles.avatar} 
-                />
+                <View style={[
+                  styles.avatarContainer,
+                  presenceState[item.sender_id]?.status === 'active' ? styles.avatarActive :
+                  presenceState[item.sender_id]?.status === 'idle' ? styles.avatarIdle :
+                  styles.avatarOffline
+                ]}>
+                  <RNImage 
+                    source={{ uri: item.is_anonymous ? 'https://ui-avatars.com/api/?name=Anonymous&background=random' : (item.profiles?.avatar_url || `https://i.pravatar.cc/80?u=${item.sender_id}`) }} 
+                    style={styles.avatar} 
+                  />
+                </View>
               )}
             </View>
           )}
@@ -815,8 +860,10 @@ export default function ChatScreen() {
             !isFirstInGroup && !isMe && styles.theirBubbleContinued,
             item.status === 'pending' && { opacity: 0.7 }
           ]}>
-            {!isMe && !isDeletedGlobally && isFirstInGroup && (
-              <Text style={styles.senderName}>{item.is_anonymous ? "🕶️ Anonymous" : (item.profiles?.full_name || "Participant")}</Text>
+            {!isDeletedGlobally && isFirstInGroup && (
+              <Text style={[styles.senderName, isMe && styles.mySenderName]}>
+                {item.is_anonymous ? "🕶️ Anonymous" : (isMe ? "You" : (item.profiles?.full_name || "Participant"))}
+              </Text>
             )}
             
             {/* Privacy Badges */}
@@ -912,7 +959,10 @@ export default function ChatScreen() {
                 {item.status === 'pending' && isMe ? (
                   <View style={styles.undoContainer}>
                     <Text style={styles.pendingText}>⏳ Sending in 10s...</Text>
-                    <TouchableOpacity onPress={() => handleUndoMessage(item.id)}>
+                    <TouchableOpacity 
+                      onPress={() => handleUndoMessage(item.id)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
                        <Text style={styles.undoText}>UNDO</Text>
                     </TouchableOpacity>
                   </View>
@@ -936,6 +986,18 @@ export default function ChatScreen() {
               </View>
             </View>
           </View>
+          {isMe && (
+            <View style={styles.avatarSpaceRight}>
+              {isFirstInGroup && (
+                <View style={[styles.avatarContainer, styles.avatarActive]}>
+                  <RNImage 
+                    source={{ uri: item.profiles?.avatar_url || `https://i.pravatar.cc/80?u=${TEST_USER_ID}` }} 
+                    style={styles.avatar} 
+                  />
+                </View>
+              )}
+            </View>
+          )}
         </TouchableOpacity>
       </View>
     );
@@ -966,7 +1028,7 @@ export default function ChatScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
-          <ChevronLeft size={24} color="#F1F5F9" />
+          <ChevronLeft size={24} color="#64748B" />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <View style={styles.headerTopRow}>
@@ -988,7 +1050,7 @@ export default function ChatScreen() {
           </View>
         </View>
         <TouchableOpacity style={styles.headerBtn} onPress={closeEvent}>
-          <MoreVertical size={20} color="#F1F5F9" />
+          <MoreVertical size={20} color="#64748B" />
         </TouchableOpacity>
       </View>
 
@@ -1319,7 +1381,8 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   header: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)",
+    paddingHorizontal: 16, paddingVertical: 12, backgroundColor: "#020617",
+    borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)",
   },
   headerBtn: {
     width: 40, height: 40, alignItems: "center", justifyContent: "center",
@@ -1336,61 +1399,128 @@ const styles = StyleSheet.create({
   },
   phaseText: { fontSize: 9, fontWeight: "800", color: "#34D399", letterSpacing: 0.5 },
   listContent: { padding: 16, paddingBottom: 40 },
-  dateSeparator: { alignSelf: 'center', marginVertical: 20, backgroundColor: 'rgba(30, 41, 59, 0.8)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
-  dateSeparatorText: { color: '#94A3B8', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
+  dateSeparator: { 
+    alignSelf: 'center', 
+    marginVertical: 24, 
+    backgroundColor: '#1E293B', 
+    paddingHorizontal: 16, 
+    paddingVertical: 6, 
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  dateSeparatorText: { color: '#94A3B8', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   messageOuter: { flexDirection: "row", marginBottom: 2, maxWidth: "85%" },
   myMessageOuter: { alignSelf: "flex-end" },
   theirMessageOuter: { alignSelf: "flex-start" },
   messageLastInGroup: { marginBottom: 12 },
-  avatarSpace: { width: 40, marginRight: 4, alignItems: 'center', justifyContent: 'flex-end' },
-  avatar: { width: 32, height: 32, borderRadius: 16, marginBottom: 2 },
+  avatarSpace: { width: 44, marginRight: 8, alignItems: 'center', justifyContent: 'flex-end' },
+  avatarSpaceRight: { width: 44, marginLeft: 8, alignItems: 'center', justifyContent: 'flex-end' },
+  avatarContainer: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    backgroundColor: '#020617',
+  },
+  avatarActive: {
+    borderColor: '#10B981',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 5,
+    elevation: 4,
+  },
+  avatarIdle: {
+    borderColor: '#F59E0B',
+  },
+  avatarOffline: {
+    borderColor: '#EF4444',
+  },
+  avatar: { width: 30, height: 30, borderRadius: 15 },
   
   // Standard Messages
-  messageBubble: { padding: 8, paddingHorizontal: 12, borderRadius: 16 },
-  myBubble: { backgroundColor: "#818CF8", borderTopRightRadius: 4 },
-  myBubbleContinued: { borderTopRightRadius: 16 },
-  theirBubble: { backgroundColor: "#141B2D", borderTopLeftRadius: 4, borderWidth: 1, borderColor: "rgba(255,255,255,0.05)" },
-  theirBubbleContinued: { borderTopLeftRadius: 16 },
-  senderName: { fontSize: 12, fontWeight: "700", color: "#818CF8", marginBottom: 2 },
+  messageBubble: { 
+    padding: 10, 
+    paddingHorizontal: 14, 
+    borderRadius: 20,
+    elevation: 1, 
+    shadowColor: "#000", 
+    shadowOffset: { width: 0, height: 1 }, 
+    shadowOpacity: 0.05, 
+    shadowRadius: 2,
+  },
+  myBubble: { 
+    backgroundColor: "#818CF8", 
+    borderTopRightRadius: 4,
+  },
+  myBubbleContinued: { borderTopRightRadius: 20 },
+  theirBubble: { 
+    backgroundColor: "#1E293B", 
+    borderTopLeftRadius: 4, 
+  },
+  theirBubbleContinued: { borderTopLeftRadius: 20 },
+  senderName: { fontSize: 12, fontWeight: "700", color: "#818CF8", marginBottom: 4 },
+  mySenderName: { textAlign: "right", color: "#F1F5F9" },
   bubbleContent: { flexDirection: 'column' },
-  messageText: { fontSize: 15, lineHeight: 22 },
+  messageText: { fontSize: 15, lineHeight: 22, color: "#F1F5F9" },
   myText: { color: "#FFFFFF" },
   theirText: { color: "#F1F5F9" },
-  messageFooter: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", marginTop: 2, gap: 4 },
+  messageFooter: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", marginTop: 4, gap: 4 },
   timestamp: { fontSize: 10, color: "rgba(255,255,255,0.5)" },
-  myTime: { color: "rgba(255, 255, 255, 0.6)" },
-  theirTime: { color: "#64748B" },
+  myTime: { color: "rgba(255,255,255,0.6)" },
+  theirTime: { color: "rgba(255,255,255,0.4)" },
   ticksContainer: { marginLeft: 2 },
   tick: { fontSize: 10, fontWeight: "800" },
-  deliveredTick: { color: "rgba(255, 255, 255, 0.5)" },
+  deliveredTick: { color: "rgba(255,255,255,0.5)" },
   seenTick: { color: "#3B82F6" },
-  
-  systemMessageContainer: { alignSelf: 'center', marginVertical: 12, backgroundColor: 'rgba(30, 41, 59, 0.5)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 },
+
+  systemMessageContainer: { 
+    alignSelf: 'center', 
+    marginVertical: 12, 
+    backgroundColor: '#1E293B', 
+    paddingHorizontal: 12, 
+    paddingVertical: 4, 
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
   systemMessageText: { color: '#94A3B8', fontSize: 11, fontWeight: '600' },
   
-  deletedBubble: { backgroundColor: "#1E293B", opacity: 0.6, borderStyle: 'dashed' },
-  deletedText: { color: "#94A3B8", fontStyle: 'italic', fontSize: 14 },
+  deletedBubble: { backgroundColor: "#141B2D", opacity: 0.8, borderStyle: 'dashed', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  deletedText: { color: "#64748B", fontStyle: 'italic', fontSize: 14 },
 
   // Media & Location
-  mediaImage: { width: 200, height: 200, borderRadius: 12, backgroundColor: "#1E293B" },
+  mediaImage: { width: 220, height: 160, borderRadius: 16, backgroundColor: "#1E293B" },
   videoContainer: { justifyContent: "center", alignItems: "center", overflow: 'hidden' },
   playIconContainer: { width: 48, height: 48, borderRadius: 24, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center" },
-  locationContainer: { width: 200, padding: 16, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.2)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.05)" },
+  locationContainer: { 
+    width: 220, 
+    padding: 12, 
+    borderRadius: 16, 
+    backgroundColor: "#141B2D", 
+    alignItems: "center", 
+    justifyContent: "center", 
+    borderWidth: 1, 
+    borderColor: "rgba(255,255,255,0.05)" 
+  },
   locationCoords: { fontSize: 10, color: "#94A3B8", marginTop: 4 },
 
   // Poll Cards
   pollCard: {
-    backgroundColor: "#141B2D",
-    borderRadius: 16,
+    backgroundColor: "#1E293B",
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.05)",
-    padding: 14,
+    padding: 16,
     minWidth: 260,
   },
-  pollHeader: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
-  pollTitle: { fontSize: 12, fontWeight: "700", color: "#818CF8", textTransform: "uppercase" },
+  pollHeader: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+  pollTitle: { fontSize: 12, fontWeight: "800", color: "#818CF8", textTransform: "uppercase", letterSpacing: 1 },
   pollQuestion: { fontSize: 16, fontWeight: "700", color: "#F1F5F9", marginBottom: 16 },
-  pollOptionsContainer: { gap: 8 },
+  pollOptionsContainer: { gap: 10 },
   pollActionItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -1401,26 +1531,27 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.05)",
   },
   pollRadio: {
-    width: 18, height: 18, borderRadius: 9, 
+    width: 20, height: 20, borderRadius: 10, 
     borderWidth: 2, borderColor: "#475569", marginRight: 12
   },
   pollResultItem: {
     position: "relative",
     backgroundColor: "#0F172A",
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.05)",
     overflow: "hidden",
   },
   myPollResult: {
-    borderColor: "rgba(129, 140, 248, 0.4)",
+    borderColor: "#818CF8",
+    backgroundColor: "#141B2D",
   },
   pollProgress: {
     position: "absolute", left: 0, top: 0, bottom: 0,
-    backgroundColor: "rgba(129, 140, 248, 0.15)",
+    backgroundColor: "rgba(129,140,248,0.1)",
   },
   myPollProgress: {
-    backgroundColor: "rgba(129, 140, 248, 0.3)",
+    backgroundColor: "rgba(129,140,248,0.2)",
   },
   pollResultContent: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
@@ -1430,25 +1561,33 @@ const styles = StyleSheet.create({
   myPollOptionText: { color: "#818CF8", fontWeight: "700" },
   pollStats: { flexDirection: "row", alignItems: "center", marginLeft: 12 },
   myVoteCheck: { color: "#818CF8", fontWeight: "800", marginRight: 6, fontSize: 14 },
-  pollPercentage: { fontSize: 12, color: "#94A3B8", minWidth: 28, textAlign: "right" },
+  pollPercentage: { fontSize: 12, color: "#94A3B8", minWidth: 32, textAlign: "right", fontWeight: "600" },
   myPollPercentage: { color: "#818CF8", fontWeight: "700" },
-  pollFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 16, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.05)", paddingTop: 12 },
-  pollFooterText: { fontSize: 12, color: "#64748B", fontWeight: "500" },
+  pollFooter: { 
+    flexDirection: "row", 
+    justifyContent: "space-between", 
+    alignItems: "center", 
+    marginTop: 16, 
+    borderTopWidth: 1, 
+    borderTopColor: "rgba(255,255,255,0.05)", 
+    paddingTop: 12 
+  },
+  pollFooterText: { fontSize: 12, color: "#64748B", fontWeight: "600" },
   pollFooterTime: { fontSize: 10, color: "#475569" },
 
   // Delete Menu Modal
   deleteMenu: {
     backgroundColor: "#0F172A",
-    borderRadius: 24,
+    borderRadius: 32,
     padding: 24,
-    width: '85%',
+    width: '90%',
     alignSelf: 'center',
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
   },
   deleteMenuTitle: {
     color: "#F1F5F9",
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "800",
     marginBottom: 20,
     textAlign: "center",
@@ -1467,8 +1606,17 @@ const styles = StyleSheet.create({
   },
 
   // Input Area Styles
-  uploadProgressContainer: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginBottom: 8, padding: 8, backgroundColor: "rgba(129, 140, 248, 0.1)", borderRadius: 12 },
+  uploadProgressContainer: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    justifyContent: "center", 
+    marginBottom: 8, 
+    padding: 8, 
+    backgroundColor: "rgba(129,140,248,0.1)", 
+    borderRadius: 12 
+  },
   uploadProgressText: { color: "#818CF8", fontSize: 13, fontWeight: "600" },
+
   inputArea: { 
     padding: 12, 
     paddingBottom: Platform.OS === "ios" ? 24 : 12,
@@ -1480,9 +1628,9 @@ const styles = StyleSheet.create({
     flexDirection: "row", 
     alignItems: "flex-end", 
     backgroundColor: "#1E293B",
-    borderRadius: 24, 
-    paddingHorizontal: 8, 
-    paddingVertical: 4, 
+    borderRadius: 28, 
+    paddingHorizontal: 10, 
+    paddingVertical: 6, 
     borderWidth: 1, 
     borderColor: "rgba(255,255,255,0.05)",
   },
@@ -1494,7 +1642,7 @@ const styles = StyleSheet.create({
   input: { 
     flex: 1, 
     color: "#F1F5F9", 
-    fontSize: 15, 
+    fontSize: 16, 
     maxHeight: 120, 
     minHeight: 40,
     paddingTop: 10,
@@ -1502,13 +1650,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   sendBtn: {
-    width: 36, 
-    height: 36, 
+    width: 40, 
+    height: 40, 
     backgroundColor: "#818CF8", 
-    borderRadius: 18,
+    borderRadius: 20,
     alignItems: "center", 
     justifyContent: "center", 
-    marginLeft: 4,
+    marginLeft: 6,
     marginBottom: 2,
   },
   sendBtnDisabled: { 
@@ -1570,109 +1718,133 @@ const styles = StyleSheet.create({
   },
 
   // Typing Area
-  typingArea: { paddingHorizontal: 20, paddingVertical: 6, backgroundColor: "transparent" },
+  typingArea: { paddingHorizontal: 20, paddingVertical: 8, backgroundColor: "transparent" },
   typingIndicatorContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   typingBubbles: { flexDirection: 'row', gap: 3, alignItems: 'center' },
-  typingDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#818CF8' },
-  typingText: { fontSize: 12, color: "#818CF8", fontWeight: "600", fontStyle: "italic" },
+  typingDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#6366F1' },
+  typingText: { fontSize: 12, color: "#6366F1", fontWeight: "600", fontStyle: "italic" },
 
-  statusDot: { width: 8, height: 8, borderRadius: 4, marginTop: 2 },
-  onlineDot: { backgroundColor: "#34D399" },
-  offlineDot: { backgroundColor: "#F87171" },
+  statusDot: { width: 10, height: 10, borderRadius: 5, marginTop: 2, borderWidth: 1.5, borderColor: '#FFFFFF' },
+  onlineDot: { backgroundColor: "#10B981" },
+  offlineDot: { backgroundColor: "#EF4444" },
 
   // Check-In Bar
   checkInBar: { 
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    backgroundColor: "#0F172A", paddingHorizontal: 16, paddingVertical: 10,
+    backgroundColor: "#141B2D", paddingHorizontal: 16, paddingVertical: 12,
     borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)",
   },
   checkInInfo: { flexDirection: "row", alignItems: "center", gap: 8 },
-  checkInText: { color: "#F1F5F9", fontSize: 13, fontWeight: "600" },
-  arrivedBtn: { backgroundColor: "#34D399", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  arrivedBtnText: { color: "#0F172A", fontSize: 12, fontWeight: "800" },
+  checkInText: { fontSize: 13, color: "#94A3B8", fontWeight: "600" },
+  arrivedBtn: { 
+    backgroundColor: "#10B981", 
+    paddingHorizontal: 12, 
+    paddingVertical: 6, 
+    borderRadius: 12,
+  },
+  arrivedBtnText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
 
-  // Pinned Banner
   pinnedBanner: {
     flexDirection: "row", alignItems: "center", backgroundColor: "#1E293B",
-    paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)",
+    paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)",
   },
-  pinnedTitle: { fontSize: 10, fontWeight: "800", color: "#818CF8", textTransform: "uppercase", marginBottom: 2 },
-  pinnedContent: { fontSize: 13, color: "#CBD5E1" },
+  pinnedTitle: { fontSize: 10, fontWeight: "800", color: "#818CF8", textTransform: "uppercase" },
+  pinnedContent: { fontSize: 13, color: "#94A3B8", fontWeight: "500" },
+
+
+  screenshotWarning: {
+    flexDirection: "row", alignItems: "center", backgroundColor: "#EF4444",
+    paddingHorizontal: 16, paddingVertical: 8, gap: 8,
+  },
+  screenshotWarningText: { color: "#FFFFFF", fontSize: 12, fontWeight: "600" },
+
 
   // Spam Warning
   spamWarning: { 
-    flexDirection: "row", alignItems: "center", backgroundColor: "rgba(245, 158, 11, 0.1)",
+    flexDirection: "row", alignItems: "center", backgroundColor: "#FEF3C7",
     paddingHorizontal: 16, paddingVertical: 8, marginHorizontal: 12, marginBottom: 8, borderRadius: 12,
-    borderWidth: 1, borderColor: "rgba(245, 158, 11, 0.2)",
+    borderWidth: 1, borderColor: "#FDE68A",
   },
-  spamWarningText: { color: "#F59E0B", fontSize: 12, fontWeight: "600" },
+  spamWarningText: { color: "#D97706", fontSize: 12, fontWeight: "600" },
 
   // Summary Card
   summaryCard: {
-    backgroundColor: "#0F172A", borderRadius: 24, padding: 24, marginVertical: 20,
-    borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", alignSelf: "stretch",
+    backgroundColor: "#FFFFFF", borderRadius: 24, padding: 24, marginVertical: 20,
+    borderWidth: 1, borderColor: "#E2E8F0", alignSelf: "stretch",
+    elevation: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10,
   },
-  summaryTitle: { fontSize: 18, fontWeight: "800", color: "#F1F5F9", marginBottom: 16, textAlign: "center" },
-  summaryRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)" },
-  summaryLabel: { fontSize: 14, color: "#94A3B8", fontWeight: "600" },
-  summaryValue: { fontSize: 14, color: "#F1F5F9", fontWeight: "700" },
+  summaryTitle: { fontSize: 18, fontWeight: "800", color: "#0F172A", marginBottom: 16, textAlign: "center" },
+  summaryRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#F1F5F9" },
+  summaryLabel: { fontSize: 14, color: "#64748B", fontWeight: "600" },
+  summaryValue: { fontSize: 14, color: "#0F172A", fontWeight: "700" },
 
   emptyContainer: { alignItems: "center", marginTop: 40 },
-  emptyTitle: { fontSize: 16, fontWeight: "700", color: "#475569", marginBottom: 20 },
+  emptyTitle: { fontSize: 16, fontWeight: "700", color: "#64748B", marginBottom: 20 },
   icebreakerContainer: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 10 },
-  icebreaker: { backgroundColor: "#1E293B", paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, borderWidth: 1, borderColor: "rgba(255,255,255,0.05)" },
-  icebreakerText: { color: "#CBD5E1", fontSize: 14, fontWeight: "600" },
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", justifyContent: "center", padding: 24 },
-  modalContent: { backgroundColor: "#0F172A", borderRadius: 32, padding: 24, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
+  icebreaker: { 
+    backgroundColor: "#FFFFFF", 
+    paddingHorizontal: 14, 
+    paddingVertical: 10, 
+    borderRadius: 20, 
+    borderWidth: 1, 
+    borderColor: "#E2E8F0",
+    elevation: 1, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2,
+  },
+  icebreakerText: { color: "#475569", fontSize: 14, fontWeight: "600" },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(15, 23, 42, 0.6)", justifyContent: "center", padding: 24 },
+  modalContent: { 
+    backgroundColor: "#FFFFFF", 
+    borderRadius: 32, 
+    padding: 24, 
+    elevation: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 30,
+  },
   modalHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 24 },
-  modalTitle: { fontSize: 20, fontWeight: "800", color: "#F1F5F9" },
+  modalTitle: { fontSize: 20, fontWeight: "800", color: "#0F172A" },
   modalInput: {
-    backgroundColor: "#1E293B", borderRadius: 16, padding: 16, color: "#F1F5F9",
-    marginBottom: 16, borderWidth: 1, borderColor: "rgba(255,255,255,0.05)",
+    backgroundColor: "#F8FAFC", borderRadius: 16, padding: 16, color: "#1E293B",
+    marginBottom: 16, borderWidth: 1, borderColor: "#E2E8F0",
   },
   addOptionBtn: { alignSelf: "flex-start", marginBottom: 24 },
-  addOptionText: { color: "#818CF8", fontWeight: "700" },
-  createPollBtn: { backgroundColor: "#818CF8", paddingVertical: 18, borderRadius: 20, alignItems: "center" },
+  addOptionText: { color: "#6366F1", fontWeight: "700" },
+  createPollBtn: { backgroundColor: "#6366F1", paddingVertical: 18, borderRadius: 20, alignItems: "center" },
   createPollBtnText: { color: "#FFFFFF", fontWeight: "800", fontSize: 16 },
 
   // Privacy Styles
-  privacyBadgeContainer: { flexDirection: 'row', marginBottom: 4, gap: 4 },
+  privacyBadgeContainer: { flexDirection: 'row', marginBottom: 6, gap: 4 },
   privacyBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, gap: 4 },
-  viewOnlyBadge: { backgroundColor: 'rgba(248, 113, 113, 0.15)' },
-  requestBadge: { backgroundColor: 'rgba(251, 191, 36, 0.15)' },
-  privacyBadgeText: { fontSize: 9, fontWeight: '800', color: '#CBD5E1', textTransform: 'uppercase' },
+  viewOnlyBadge: { backgroundColor: 'rgba(239, 68, 68, 0.2)' },
+  requestBadge: { backgroundColor: 'rgba(245, 158, 11, 0.2)' },
+  privacyBadgeText: { fontSize: 9, fontWeight: '800', color: '#F1F5F9', textTransform: 'uppercase' },
   
-  restrictedMediaContainer: { width: 200, height: 200, borderRadius: 12, overflow: 'hidden', backgroundColor: '#0F172A' },
-  restrictOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  restrictTitle: { color: '#FFF', fontSize: 16, fontWeight: '800', marginTop: 12, textAlign: 'center' },
+  restrictedMediaContainer: { width: 220, height: 160, borderRadius: 16, overflow: 'hidden', backgroundColor: '#141B2D' },
+  restrictOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(2, 6, 23, 0.9)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  restrictTitle: { color: '#F1F5F9', fontSize: 16, fontWeight: '800', marginTop: 12, textAlign: 'center' },
   restrictSubtitle: { color: '#94A3B8', fontSize: 12, textAlign: 'center', marginTop: 4 },
   requestActionBtn: { backgroundColor: '#818CF8', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, marginTop: 16 },
   requestActionText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
   
-  viewOnlyOverlay: { position: 'absolute', bottom: 8, left: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.6)', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  viewOnlyOverlay: { position: 'absolute', bottom: 8, left: 8, right: 8, backgroundColor: 'rgba(2, 6, 23, 0.7)', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
   viewOnlyText: { color: '#FFF', fontSize: 10, fontWeight: '600' },
 
-  permissionSelector: { marginBottom: 24, padding: 16, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20 },
+  permissionSelector: { marginBottom: 24, padding: 16, backgroundColor: '#141B2D', borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
   permissionLabel: { color: '#94A3B8', fontSize: 12, fontWeight: '700', marginBottom: 12, textTransform: 'uppercase' },
   permissionOptions: { flexDirection: 'row', gap: 8 },
-  permissionOption: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', backgroundColor: 'rgba(255,255,255,0.02)' },
+  permissionOption: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', backgroundColor: 'rgba(255,255,255,0.02)' },
   permissionOptionActive: { backgroundColor: '#818CF8', borderColor: '#818CF8' },
-  permissionOptionText: { fontSize: 10, fontWeight: '800', color: '#64748B' },
+  permissionOptionText: { fontSize: 10, fontWeight: '800', color: '#94A3B8' },
   permissionOptionTextActive: { color: '#FFF' },
   permissionHint: { color: '#64748B', fontSize: 11, marginTop: 10, fontStyle: 'italic' },
-
-  screenshotWarning: { position: 'absolute', top: 80, left: 20, right: 20, backgroundColor: '#EF4444', padding: 12, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 1000, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 10 },
-  screenshotWarningText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
   
   // Undo Message Timer
-  undoContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginTop: 4, width: '100%' },
-  pendingText: { color: '#FCD34D', fontSize: 11, fontWeight: '600', fontStyle: 'italic' },
+  undoContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(245, 158, 11, 0.1)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, marginTop: 4, width: '100%', borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.2)' },
+  pendingText: { color: '#F59E0B', fontSize: 11, fontWeight: '600', fontStyle: 'italic' },
   undoText: { color: '#EF4444', fontSize: 11, fontWeight: '800', backgroundColor: 'rgba(239, 68, 68, 0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
 
   // Advanced Features Toggles
   advancedFeaturesRow: { flexDirection: 'row', gap: 8, marginBottom: 12, paddingHorizontal: 8 },
-  featureToggle: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, gap: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
-  featureToggleActive: { backgroundColor: 'rgba(129, 140, 248, 0.2)', borderColor: 'rgba(129, 140, 248, 0.4)' },
+  featureToggle: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#141B2D', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16, gap: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  featureToggleActive: { backgroundColor: 'rgba(129, 140, 248, 0.15)', borderColor: '#818CF8' },
   featureToggleText: { color: '#94A3B8', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
-  featureToggleTextActive: { color: '#FFF' },
+  featureToggleTextActive: { color: '#818CF8' },
+
 });

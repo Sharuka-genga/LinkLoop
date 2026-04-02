@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   ScrollView, View, Text, StyleSheet, TouchableOpacity,
-  TextInput, SafeAreaView, StatusBar, Image, RefreshControl,
+  TextInput, StatusBar, Image, RefreshControl,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Search, SlidersHorizontal, Bell } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";

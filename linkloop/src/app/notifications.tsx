@@ -6,7 +6,8 @@ import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { Swipeable } from "react-native-gesture-handler";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, SectionList, SafeAreaView, StatusBar, Dimensions, Pressable, Alert, Image, Animated } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, SectionList, StatusBar, Dimensions, Pressable, Alert, Image, Animated } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
 

@@ -108,6 +108,8 @@ export async function sendMessage(eventId: string, content: string, mediaUrl?: s
 }
 
 export async function confirmMessageSent(messageId: string) {
+  if (messageId.startsWith('mock-')) return null;
+
   const { data, error } = await supabase
     .from("messages")
     .update({ status: 'sent' })
@@ -119,6 +121,7 @@ export async function confirmMessageSent(messageId: string) {
 }
 
 export async function cancelPendingMessage(messageId: string) {
+  if (messageId.startsWith('mock-')) return;
   const { error } = await supabase
     .from("messages")
     .update({ status: 'cancelled' })
@@ -200,6 +203,7 @@ export async function uploadChatMediaDirectly(eventId: string, fileUri: string, 
 
 
 export async function deleteMessageForEveryone(messageId: string) {
+  if (messageId.startsWith('mock-')) return;
   const { error } = await supabase
     .from("messages")
     .update({ content: "[[DELETED]]", media_url: null })
@@ -333,6 +337,7 @@ export async function respondToMediaAccessRequest(requestId: string, status: 'ap
 }
 
 export async function requestMediaAccess(mediaId: string) {
+    if (mediaId.startsWith('mock-')) return { mocked: true };
     const { data, error } = await supabase
         .from("media_access_requests")
         .insert({
@@ -380,6 +385,7 @@ export async function createPoll(eventId: string, question: string, options: str
 }
 
 export async function voteInPoll(optionId: string) {
+    if (optionId.startsWith('mock-')) return;
     const { error } = await supabase
         .from("chat_poll_votes")
         .insert({ option_id: optionId, user_id: TEST_USER_ID });
@@ -436,6 +442,7 @@ export function broadcastReadReceipt(channel: any, userId: string, messageId: st
 // ── Pinned Messages & Check-Ins ─────────────────────────────
 
 export async function pinMessage(messageId: string, isPinned: boolean) {
+  if (messageId.startsWith('mock-')) return;
   const { error } = await supabase
     .from("messages")
     .update({ is_pinned: isPinned })
