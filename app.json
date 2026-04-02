@@ -53,8 +53,6 @@
           }
         }
       ]
-
-      
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,46 +1,47 @@
-import { BG, BR, FW, TX } from '@/constants/theme';
-import { supabase } from '@/lib/supabase';
-import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import React, { useState } from 'react';
+import { BG, BR, FW, TX } from "@/constants/theme";
+import { supabase } from "@/lib/supabase";
+import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  //validating the email format
   const isValidSliitEmail = (e: string) =>
     /^[iI][tT]\d+@my\.sliit\.lk$/.test(e.trim());
 
   async function handleLogin() {
     if (!email) {
-      Alert.alert('Hold on!', 'Please enter your email.');
+      Alert.alert("Hold on!", "Please enter your email.");
       return;
     }
     if (!isValidSliitEmail(email)) {
       Alert.alert(
-        'Invalid University Email',
-        'You must use a valid SLIIT student email.\nExample: IT23229952@my.sliit.lk',
+        "Invalid University Email",
+        "You must use a valid SLIIT student email.\nExample: IT23229952@my.sliit.lk",
       );
       return;
     }
     if (!password) {
-      Alert.alert('Error', 'Please enter your password.');
+      Alert.alert("Error", "Please enter your password.");
       return;
     }
 
@@ -52,21 +53,23 @@ export default function LoginScreen() {
     setLoading(false);
 
     if (error) {
-      Alert.alert('Authentication Failed', error.message);
+      Alert.alert("Authentication Failed", error.message);
     } else {
       // Navigate to tabs on success (fallback if auth listener doesn't redirect)
-      router.replace('/(tabs)' as any);
+      router.replace("/(tabs)" as any);
     }
   }
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}>
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.container}
+    >
       <StatusBar style="light" />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.hero}>
           <Text style={styles.logo}>LinkLoop</Text>
           <Text style={styles.tagline}>Connect. Engage. Thrive.</Text>
@@ -106,7 +109,8 @@ export default function LoginScreen() {
             style={styles.button}
             onPress={handleLogin}
             activeOpacity={0.8}
-            disabled={loading}>
+            disabled={loading}
+          >
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
@@ -116,9 +120,10 @@ export default function LoginScreen() {
 
           <TouchableOpacity
             style={styles.toggleBtn}
-            onPress={() => router.push('./signup' as any)}>
+            onPress={() => router.push("./signup" as any)}
+          >
             <Text style={styles.toggleText}>
-              Don't have an account?{' '}
+              Don't have an account?{" "}
               <Text style={styles.toggleHighlight}>Sign Up</Text>
             </Text>
           </TouchableOpacity>
@@ -132,15 +137,15 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG.main },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
   },
-  hero: { alignItems: 'center', marginBottom: 40 },
+  hero: { alignItems: "center", marginBottom: 40 },
   logo: {
     fontSize: 48,
     fontWeight: FW.hero,
-    color: '#818CF8',
+    color: "#818CF8",
     letterSpacing: 2,
   },
   tagline: {
@@ -177,7 +182,7 @@ const styles = StyleSheet.create({
     fontWeight: FW.body,
     color: TX.label,
     marginBottom: 6,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     letterSpacing: 0.8,
   },
   input: {
@@ -191,23 +196,23 @@ const styles = StyleSheet.create({
     borderColor: BG.border,
   },
   button: {
-    backgroundColor: '#818CF8',
+    backgroundColor: "#818CF8",
     paddingVertical: 16,
     borderRadius: BR.button,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 8,
   },
   buttonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 17,
     fontWeight: FW.header,
     letterSpacing: 0.5,
   },
-  toggleBtn: { marginTop: 20, alignItems: 'center' },
+  toggleBtn: { marginTop: 20, alignItems: "center" },
   toggleText: {
     color: TX.secondary,
     fontSize: 14,
     fontWeight: FW.body,
   },
-  toggleHighlight: { color: '#818CF8' },
+  toggleHighlight: { color: "#818CF8" },
 });

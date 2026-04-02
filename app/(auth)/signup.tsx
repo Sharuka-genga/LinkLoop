@@ -62,7 +62,7 @@ export default function SignupScreen() {
       }
     }
   }
-
+  //validation to check the email format
   const isValidSliitEmail = (e: string) =>
     /^[iI][tT]\d+@my\.sliit\.lk$/.test(e.trim());
 
