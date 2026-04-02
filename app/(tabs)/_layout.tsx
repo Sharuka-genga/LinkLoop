@@ -19,6 +19,7 @@ export default function TabLayout() {
         <Tabs.Screen name="activities" />
         <Tabs.Screen name="profile" />
         <Tabs.Screen name="explore" options={{ href: null }} />
+        <Tabs.Screen name="weekly-report" options={{ href: null }} />
       </Tabs>
       <NavBar />
     </View>

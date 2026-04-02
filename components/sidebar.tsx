@@ -102,18 +102,11 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
             color: '#34D399',
         },
         {
-            icon: 'notifications',
-            label: 'Notifications',
-            description: 'Your alerts & updates',
-            route: '/notifications',
-            color: '#818CF8',
-        },
-        {
-            icon: 'settings',
-            label: 'Settings',
-            description: 'App preferences',
-            route: '/settings',
-            color: '#818CF8',
+            icon: 'insert-chart',
+            label: 'Weekly Activity',
+            description: 'Your weekly progress report',
+            route: '/weekly-report',
+            color: '#F43F5E',
         },
     ];
 

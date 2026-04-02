@@ -14,12 +14,7 @@ import {
 
 const { width } = Dimensions.get('window');
 
-type WeeklyStats = {
-  eventsJoined: number;
-  sportsPlayed: number;
-  bookingsMade: number;
-  pointsEarned: number;
-};
+import WeeklyReport, { fetchWeeklyStats, WeeklyStats } from '@/components/weekly-report';
 
 type RecentActivity = {
   id: string;
@@ -58,24 +53,8 @@ export default function HomeScreen() {
       setEngagementScore(profileData.engagement_score ?? 0);
     }
 
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-
-    const { data: activities } = await supabase
-      .from('activities')
-      .select('*')
-      .eq('user_id', user.id)
-      .gte('created_at', weekAgo.toISOString())
-      .order('created_at', { ascending: false });
-
-    if (activities) {
-      setWeeklyStats({
-        eventsJoined: activities.filter((a) => a.type === 'event').length,
-        sportsPlayed: activities.filter((a) => a.type === 'sport').length,
-        bookingsMade: activities.filter((a) => a.type === 'booking').length,
-        pointsEarned: activities.reduce((sum, a) => sum + (a.points ?? 0), 0),
-      });
-    }
+    const fetchedStats = await fetchWeeklyStats(user.id);
+    setWeeklyStats(fetchedStats);
 
     const { data: recent } = await supabase
       .from('activities')
@@ -175,69 +154,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Weekly Activity Report */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Weekly Activity Report</Text>
-          <Text style={styles.sectionSub}>Last 7 days</Text>
 
-          <View style={styles.statsGrid}>
-            <View style={styles.statBox}>
-              <Text style={[styles.statNum, { color: Accent.campus }]}>{weeklyStats.eventsJoined}</Text>
-              <Text style={styles.statLabel}>Events</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={[styles.statNum, { color: Accent.sports }]}>{weeklyStats.sportsPlayed}</Text>
-              <Text style={styles.statLabel}>Sports</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={[styles.statNum, { color: Accent.trips }]}>{weeklyStats.bookingsMade}</Text>
-              <Text style={styles.statLabel}>Bookings</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={[styles.statNum, { color: Status.open }]}>{weeklyStats.pointsEarned}</Text>
-              <Text style={styles.statLabel}>Points</Text>
-            </View>
-          </View>
-
-          <View style={styles.progressSection}>
-            <Text style={styles.progressLabel}>Weekly Goal: 100 pts</Text>
-            <View style={styles.progressBar}>
-              <View
-                style={[
-                  styles.progressFill,
-                  { width: `${Math.min((weeklyStats.pointsEarned / 100) * 100, 100)}%` },
-                ]}
-              />
-            </View>
-            <Text style={styles.progressText}>{weeklyStats.pointsEarned}/100 points</Text>
-          </View>
-        </View>
-
-        {/* Recent Activities */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
-          {recentActivities.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>No activities yet</Text>
-              <Text style={styles.emptyDesc}>
-                Join events, book courts, or find a companion to start earning points!
-              </Text>
-            </View>
-          ) : (
-            recentActivities.map((activity) => (
-              <View key={activity.id} style={styles.activityRow}>
-                <View style={[styles.activityDot, { backgroundColor: typeColor[activity.type] || Accent.other }]} />
-                <View style={styles.activityInfo}>
-                  <Text style={styles.activityTitle}>{activity.title}</Text>
-                  <Text style={styles.activityDate}>{activity.date}</Text>
-                </View>
-                <View style={styles.pointsBadge}>
-                  <Text style={styles.pointsText}>+{activity.points}</Text>
-                </View>
-              </View>
-            ))
-          )}
-        </View>
       </ScrollView>
     </View>
   );
@@ -301,23 +218,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 20, fontWeight: FW.header, color: TX.primary, marginBottom: 2 },
   sectionSub: { fontSize: 13, fontWeight: FW.caption, color: TX.label, marginBottom: 16 },
 
-  statsGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-  statBox: {
-    alignItems: 'center',
-    flex: 1,
-    backgroundColor: BG.input,
-    borderRadius: BR.smallButton,
-    paddingVertical: 14,
-    marginHorizontal: 3,
-  },
-  statNum: { fontSize: 22, fontWeight: FW.hero },
-  statLabel: { fontSize: 11, fontWeight: FW.body, color: TX.label, marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.5 },
-
-  progressSection: { marginTop: 4 },
-  progressLabel: { fontSize: 13, fontWeight: FW.body, color: TX.secondary, marginBottom: 8 },
-  progressBar: { height: 8, backgroundColor: BG.input, borderRadius: 4, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: Status.open, borderRadius: 4 },
-  progressText: { fontSize: 12, fontWeight: FW.caption, color: TX.label, marginTop: 6, textAlign: 'right' },
+  // Weekly Report styles have been extracted into WeeklyReport component for reusability
 
   activityRow: {
     flexDirection: 'row',
