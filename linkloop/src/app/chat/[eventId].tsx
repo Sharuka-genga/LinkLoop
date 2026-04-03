@@ -126,6 +126,16 @@ export default function ChatScreen() {
         Object.keys(state).forEach((key) => {
           simplifiedState[key] = state[key][0] as any as PresenceState;
         });
+
+        // Inject mock idle user Sarah for demonstration
+        simplifiedState['user_idle'] = {
+          user_id: 'user_idle',
+          full_name: 'Sarah',
+          avatar_url: 'https://i.pravatar.cc/150?u=sarah',
+          status: 'idle',
+          last_active: new Date(Date.now() - 5 * 60 * 1000).toISOString()
+        };
+        
         setPresenceState(simplifiedState);
       })
       .on('presence', { event: 'join' }, ({ key, newPresences }) => {
@@ -314,7 +324,7 @@ export default function ChatScreen() {
           {
             id: 'm4',
             event_id: eventId!,
-            sender_id: 'user_2',
+            sender_id: 'user_idle',
             content: 'I\'ll be a bit late 😅',
             created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(), // Today
             status: 'delivered',
@@ -323,7 +333,7 @@ export default function ChatScreen() {
           {
             id: 'm5',
             event_id: eventId!,
-            sender_id: 'user_2',
+            sender_id: 'user_idle',
             content: 'Wait for me for 10 mins',
             created_at: new Date(Date.now() - 1000 * 60 * 4).toISOString(),
             status: 'delivered',
