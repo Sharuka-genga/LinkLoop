@@ -10,13 +10,91 @@ import {
   StatusBar,
 } from "react-native";
 
-const eventsData = [
-  { id: 1, title: "Football Match", category: "Sports", time: "evening", popularity: 4, joined: 7, total: 11 },
-  { id: 2, title: "Study Group", category: "Study", time: "morning", popularity: 5, joined: 3, total: 5 },
-  { id: 3, title: "Gaming Night", category: "Gaming", time: "night", popularity: 3, joined: 5, total: 8 },
-  { id: 4, title: "Campus Meetup", category: "Campus Events", time: "afternoon", popularity: 2, joined: 10, total: 20 },
-  { id: 5, title: "Gym Session", category: "Fitness", time: "evening", popularity: 4, joined: 4, total: 6 },
-  { id: 6, title: "Coffee Hangout", category: "Food & Hangouts", time: "afternoon", popularity: 3, joined: 2, total: 4 },
+type EventItem = {
+  id: number;
+  title: string;
+  category: string;
+  time: string;
+  popularity: number;
+  joined: number;
+  total: number;
+  location: string;
+  description: string;
+};
+
+const eventsData: EventItem[] = [
+  {
+    id: 1,
+    title: "Football Match",
+    category: "Sports",
+    time: "evening",
+    popularity: 4,
+    joined: 7,
+    total: 11,
+    location: "Main Ground",
+    description:
+      "Friendly football session for students who want to join a team and play together.",
+  },
+  {
+    id: 2,
+    title: "Study Group",
+    category: "Study",
+    time: "morning",
+    popularity: 5,
+    joined: 3,
+    total: 5,
+    location: "Library",
+    description:
+      "Group study session with shared notes, discussion, and collaborative preparation.",
+  },
+  {
+    id: 3,
+    title: "Gaming Night",
+    category: "Gaming",
+    time: "night",
+    popularity: 3,
+    joined: 5,
+    total: 8,
+    location: "Student Lounge",
+    description:
+      "Relax and play games with other students in a fun casual environment.",
+  },
+  {
+    id: 4,
+    title: "Campus Meetup",
+    category: "Campus Events",
+    time: "afternoon",
+    popularity: 2,
+    joined: 10,
+    total: 20,
+    location: "Open Area",
+    description:
+      "Meetup to socialize, connect, and take part in campus activities.",
+  },
+  {
+    id: 5,
+    title: "Coffee Hangout",
+    category: "Food & Hangouts",
+    time: "afternoon",
+    popularity: 3,
+    joined: 2,
+    total: 4,
+    location: "Cafeteria",
+    description:
+      "Informal coffee hangout to meet new people and relax after lectures.",
+  },
+  {
+    id: 6,
+    title: "Gym Session",
+    category: "Fitness",
+    time: "evening",
+    popularity: 4,
+    joined: 4,
+    total: 6,
+    location: "Sports Complex",
+    description:
+      "Workout and fitness session for students who want to stay active.",
+  },
 ];
 
 export default function Suggestions() {
@@ -26,7 +104,7 @@ export default function Suggestions() {
   const rawInterests =
     typeof params.interests === "string" ? params.interests : "[]";
 
-  const selectedInterests = JSON.parse(rawInterests);
+  const selectedInterests: string[] = JSON.parse(rawInterests);
   const selectedTime = typeof params.time === "string" ? params.time : "";
 
   const results = eventsData
@@ -41,12 +119,15 @@ export default function Suggestions() {
 
       let reason = "Suggested based on popularity";
 
-      if (selectedInterests.includes(event.category) && selectedTime === event.time) {
-        reason = "Highly recommended based on your interest and time";
+      if (
+        selectedInterests.includes(event.category) &&
+        selectedTime === event.time
+      ) {
+        reason = "Best match for your interest and time";
       } else if (selectedInterests.includes(event.category)) {
-        reason = "Recommended based on your selected interest";
+        reason = "Matches your selected interest";
       } else if (selectedTime === event.time) {
-        reason = "Recommended because it matches your time";
+        reason = "Matches your selected time";
       }
 
       return { ...event, score, reason };
@@ -70,12 +151,12 @@ export default function Suggestions() {
 
           <Text style={styles.title}>Suggested for You</Text>
           <Text style={styles.info}>
-            Based on your preferences, we found the best matching events for you.
+            Based on your preferences, here are the most relevant events.
           </Text>
 
           {results.length === 0 ? (
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>No events found 😔</Text>
+              <Text style={styles.emptyTitle}>No matching events found</Text>
               <Text style={styles.emptyText}>
                 Try changing your interest or time slot.
               </Text>
@@ -86,9 +167,7 @@ export default function Suggestions() {
 
               return (
                 <View key={item.id} style={styles.card}>
-                  {index === 0 && (
-                    <Text style={styles.badge}>🔥 Top Pick</Text>
-                  )}
+                  {index === 0 && <Text style={styles.badge}>🔥 Top Pick</Text>}
 
                   <Text style={styles.cardTitle}>{item.title}</Text>
 
@@ -99,6 +178,7 @@ export default function Suggestions() {
                   <Text style={styles.slot}>
                     👥 {item.joined}/{item.total} joined
                   </Text>
+
                   <Text style={styles.slotLeft}>
                     {item.total - item.joined} spots left
                   </Text>
@@ -107,7 +187,24 @@ export default function Suggestions() {
 
                   <Text style={styles.reason}>{item.reason}</Text>
 
-                  <TouchableOpacity style={styles.viewBtn}>
+                  <TouchableOpacity
+                    style={styles.viewBtn}
+                    onPress={() =>
+                      router.push(
+                        `/event-details?id=${item.id}&title=${encodeURIComponent(
+                          item.title
+                        )}&category=${encodeURIComponent(
+                          item.category
+                        )}&time=${encodeURIComponent(
+                          item.time
+                        )}&location=${encodeURIComponent(
+                          item.location
+                        )}&description=${encodeURIComponent(
+                          item.description
+                        )}&joined=${item.joined}&total=${item.total}`
+                      )
+                    }
+                  >
                     <Text style={styles.viewText}>View Details</Text>
                   </TouchableOpacity>
                 </View>
