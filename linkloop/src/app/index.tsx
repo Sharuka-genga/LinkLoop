@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   ScrollView, View, Text, StyleSheet, TouchableOpacity,
-  TextInput, StatusBar, Image, RefreshControl,
+  TextInput, SafeAreaView, StatusBar, Image, RefreshControl,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { Search, SlidersHorizontal, Bell } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import EventCard from "../components/EventCard";
+import { CategoryScroll } from "../components/CategoryScroll";
 import { getEvents } from "@/lib/events";
 
 const FILTER_TABS = [
@@ -17,11 +17,15 @@ const FILTER_TABS = [
   { key: "social", label: "Social" },
   { key: "food", label: "Food" },
   { key: "gaming", label: "Gaming" },
+  { key: "fitness", label: "Fitness" },
+  { key: "trips", label: "Trips" },
+  { key: "campus", label: "Campus" },
 ];
 
 const TAB_ACCENT: Record<string, string> = {
   all: "#818CF8", sports: "#FF6B35", study: "#818CF8",
   social: "#F472B6", food: "#FBBF24", gaming: "#34D399",
+  fitness: "#F87171", trips: "#38BDF8", campus: "#A78BFA",
 };
 
 function formatTime(timeStr: string): string {
@@ -46,6 +50,7 @@ export default function Page() {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const loadEvents = async () => {
     try {
@@ -86,10 +91,10 @@ export default function Page() {
         <View style={styles.header}>
           <View>
             <Text style={styles.greetingSmall}>GOOD DAY</Text>
-            <Text style={styles.greeting}>Hey, Dinuka </Text>
+            <Text style={styles.greeting}>Hey, Kavindu </Text>
           </View>
           <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.notifBtn} onPress={() => router.push("/notifications")}>
+            <TouchableOpacity style={styles.notifBtn}>
               <Bell size={20} color="#CBD5E1" strokeWidth={2} />
               <View style={styles.notifDot} />
             </TouchableOpacity>
@@ -102,28 +107,11 @@ export default function Page() {
           </View>
         </View>
 
-        {/* Stat strip */}
-        <View style={styles.statStrip}>
-          <View style={styles.statItem}>
-            <Text style={styles.statNum}>{events.length}</Text>
-            <Text style={styles.statLabel}>Active Events</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statNum}>3</Text>
-            <Text style={styles.statLabel}>You Joined</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statNum, { color: "#34D399" }]}>5</Text>
-            <Text style={styles.statLabel}>Near You</Text>
-          </View>
-        </View>
 
-        {/* Search */}
+        {/* Search & Filter */}
         <View style={styles.searchRow}>
           <View style={styles.searchBox}>
-            <Search size={16} color="#475569" strokeWidth={2.5} />
+            <Search size={14} color="#475569" strokeWidth={2.5} />
             <TextInput
               placeholder="Search events, people..."
               placeholderTextColor="#334155"
@@ -132,35 +120,55 @@ export default function Page() {
               onChangeText={setSearchQuery}
             />
           </View>
-          <TouchableOpacity style={styles.filterBtn}>
-            <SlidersHorizontal size={18} color="#0F172A" strokeWidth={2} />
-          </TouchableOpacity>
+          
+          <View style={styles.filterWrapper}>
+            <TouchableOpacity 
+              style={styles.filterBtn}
+              onPress={() => setIsFilterOpen(!isFilterOpen)}
+              activeOpacity={0.8}
+            >
+              <SlidersHorizontal size={16} color="#0F172A" strokeWidth={2.5} />
+            </TouchableOpacity>
+
+            {/* Category Dropdown */}
+            {isFilterOpen && (
+              <>
+                <TouchableOpacity 
+                  style={styles.dropdownOverlay} 
+                  onPress={() => setIsFilterOpen(false)} 
+                  activeOpacity={1} 
+                />
+                <View style={styles.dropdown}>
+                  <Text style={styles.dropdownTitle}>FILTER BY CATEGORY</Text>
+                  <View style={styles.dropdownDivider} />
+                  <ScrollView style={styles.dropdownScroll} showsVerticalScrollIndicator={false}>
+                    {FILTER_TABS.map((tab) => {
+                      const isActive = activeFilter === tab.key;
+                      const accent = TAB_ACCENT[tab.key];
+                      return (
+                        <TouchableOpacity
+                          key={tab.key}
+                          style={[styles.dropdownItem, isActive && { backgroundColor: "rgba(129,140,248,0.1)" }]}
+                          onPress={() => {
+                            setActiveFilter(tab.key);
+                            setIsFilterOpen(false);
+                          }}
+                        >
+                          <Text style={[styles.dropdownItemText, isActive && { color: "#F1F5F9", fontWeight: "800" }]}>
+                            {tab.label}
+                          </Text>
+                          {isActive && <View style={[styles.activeIndicator, { backgroundColor: "#818CF8" }]} />}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              </>
+            )}
+          </View>
         </View>
 
-        {/* Tabs */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.tabsScroll}
-          contentContainerStyle={styles.tabs}
-        >
-          {FILTER_TABS.map((tab) => {
-            const isActive = activeFilter === tab.key;
-            const accent = TAB_ACCENT[tab.key] ?? "#818CF8";
-            return (
-              <TouchableOpacity
-                key={tab.key}
-                style={[styles.tab, isActive && { backgroundColor: accent, borderColor: accent }]}
-                onPress={() => setActiveFilter(tab.key)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        <CategoryScroll />
 
         {/* Section header */}
         <View style={styles.sectionHeader}>
@@ -192,13 +200,14 @@ export default function Page() {
               peopleNeeded={event.people_needed}
               category={event.category_id}
               creatorId={event.creator_id}
-              creatorName={event.profiles?.name || "Unknown"}
+              creatorName={event.creatorName || "Unknown"}
               creatorAvatar={
-                event.profiles?.avatar_url || "https://i.pravatar.cc/80?img=1"
+                event.creatorAvatar || (event.creator_id === "8d30902c-c3ca-470a-8f4b-b1b545e8f452" ? "https://i.pravatar.cc/150?img=12" : "https://i.pravatar.cc/150?u=diverse")
               }
               joinMode={event.join_mode}
               spotsLeft={event.people_needed}
               totalSpots={event.people_needed}
+              subcategoryLabel={event.subcategory_label}
               onDelete={loadEvents}
             />
           ))
@@ -249,26 +258,37 @@ const styles = StyleSheet.create({
   statNum: { fontSize: 22, fontWeight: "800", color: "#F1F5F9", letterSpacing: -0.5 },
   statLabel: { fontSize: 11, color: "#475569", fontWeight: "600", marginTop: 2 },
   statDivider: { width: 1, backgroundColor: "#1E2A40" },
-  searchRow: { flexDirection: "row", gap: 10, marginBottom: 18 },
+  searchRow: { flexDirection: "row", gap: 8, marginBottom: 18, zIndex: 1000 },
   searchBox: {
     flex: 1, flexDirection: "row", alignItems: "center",
-    backgroundColor: "#141B2D", borderRadius: 14,
-    paddingHorizontal: 14, paddingVertical: 13,
-    borderWidth: 1, borderColor: "#1E2A40", gap: 10,
+    backgroundColor: "#141B2D", borderRadius: 12,
+    paddingHorizontal: 12, paddingVertical: 10,
+    borderWidth: 1, borderColor: "#1E2A40", gap: 8,
   },
-  searchInput: { flex: 1, fontSize: 14, color: "#CBD5E1", fontWeight: "500" },
+  searchInput: { flex: 1, fontSize: 13, color: "#CBD5E1", fontWeight: "500" },
+  filterWrapper: { position: "relative" },
   filterBtn: {
-    backgroundColor: "#818CF8", width: 48, height: 48,
-    borderRadius: 14, alignItems: "center", justifyContent: "center",
+    backgroundColor: "#818CF8", width: 42, height: 42,
+    borderRadius: 12, alignItems: "center", justifyContent: "center",
   },
-  tabsScroll: { marginBottom: 20 },
-  tabs: { gap: 8, paddingRight: 8 },
-  tab: {
-    paddingHorizontal: 18, paddingVertical: 9, borderRadius: 20,
-    backgroundColor: "#141B2D", borderWidth: 1.5, borderColor: "#1E2A40",
+  dropdownOverlay: {
+    position: "absolute", top: -500, left: -500, right: -500, bottom: -500,
+    zIndex: 998,
   },
-  tabText: { fontSize: 13, fontWeight: "700", color: "#475569" },
-  tabTextActive: { color: "#0F172A" },
+  dropdown: {
+    position: "absolute", top: 50, right: 0,
+    backgroundColor: "#141B2D", borderRadius: 16,
+    borderWidth: 1, borderColor: "#1E2A40",
+    width: 200, zIndex: 999, paddingVertical: 10,
+    shadowColor: "#000", shadowOpacity: 0.5, shadowRadius: 15, elevation: 10,
+  },
+  dropdownTitle: { fontSize: 9, fontWeight: "800", color: "#475569", letterSpacing: 1.5, marginLeft: 16, marginBottom: 8 },
+  dropdownDivider: { height: 1, backgroundColor: "#1E2A40", marginBottom: 4 },
+  dropdownScroll: { maxHeight: 300 },
+  dropdownItem: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
+  dropdownItemText: { fontSize: 14, color: "#94A3B8", fontWeight: "600" },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  activeIndicator: { width: 4, height: 4, borderRadius: 2, marginLeft: "auto" },
   sectionHeader: {
     flexDirection: "row", justifyContent: "space-between",
     alignItems: "center", marginBottom: 14,
@@ -280,5 +300,4 @@ const styles = StyleSheet.create({
   empty: { alignItems: "center", paddingVertical: 60 },
   emptyTitle: { fontSize: 16, fontWeight: "800", color: "#334155", marginBottom: 4 },
   emptySub: { fontSize: 13, color: "#1E2A40" },
-
 });

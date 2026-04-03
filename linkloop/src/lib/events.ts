@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 
-const TEST_USER_ID = "00000000-0000-0000-0000-000000000001";
+const TEST_USER_ID = "8d30902c-c3ca-470a-8f4b-b1b545e8f452"; // Kavindu = YOU
 
 // ── Save event to Supabase ──────────────────────────────────────
 export async function createEvent(data: {

@@ -1,17 +1,10 @@
 {
+  "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "target": "ESNext",
-    "lib": [
-      "DOM",
-      "DOM.Iterable",
-      "ESNext"
-    ],
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
-    "module": "ESNext",
     "moduleResolution": "bundler",
-    "jsx": "react-native",
     "baseUrl": ".",
     "paths": {
       "@/*": [
@@ -24,6 +17,5 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
-  ],
-  "extends": "expo/tsconfig.base"
+  ]
 }
