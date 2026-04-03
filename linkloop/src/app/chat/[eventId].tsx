@@ -338,6 +338,15 @@ export default function ChatScreen() {
             created_at: new Date(Date.now() - 1000 * 60 * 4).toISOString(),
             status: 'delivered',
             profiles: { full_name: 'Sarah', avatar_url: 'https://i.pravatar.cc/150?u=sarah' }
+          },
+          {
+            id: 'm6',
+            event_id: eventId!,
+            sender_id: 'user_offline_2',
+            content: 'I\'ll be there in 15 mins!',
+            created_at: new Date(Date.now() - 1000 * 60 * 2).toISOString(),
+            status: 'delivered',
+            profiles: { full_name: 'Mike', avatar_url: 'https://i.pravatar.cc/150?u=mike' }
           }
         ];
         setMessages(mockMsgs);
