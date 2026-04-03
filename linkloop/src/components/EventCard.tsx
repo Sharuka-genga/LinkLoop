@@ -2,6 +2,7 @@ import { useState } from "react";
 import { View, Text, StyleSheet, Image, TouchableOpacity, Alert } from "react-native";
 import { MapPin, Clock, Users, ChevronRight, Zap, MessageCircle, CheckCircle, Pencil, Trash2 } from "lucide-react-native";
 import { deleteEvent } from "@/lib/events";
+import { useRouter } from "expo-router";
 
 const TEST_USER_ID = "8d30902c-c3ca-470a-8f4b-b1b545e8f452"; // Kavindu = YOU
 
@@ -45,6 +46,7 @@ export default function EventCard({
 }: Props) {
   const cat = CATEGORY_CONFIG[category] ?? CATEGORY_CONFIG.other;
   const isHost = creatorId === TEST_USER_ID;
+  const router = useRouter();
   const [joinState, setJoinState] = useState<JoinState>("idle");
   const [showDropdown, setShowDropdown] = useState(false);
 
@@ -90,7 +92,7 @@ export default function EventCard({
   };
 
   const handleOpenChat = () => {
-    Alert.alert("Opening Chat", "Redirecting to messaging portal...");
+    router.push(`/chat/${id}`);
   };
 
   return (
