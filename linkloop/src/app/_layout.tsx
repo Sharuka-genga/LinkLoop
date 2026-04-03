@@ -8,7 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { BG } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/context/auth-context';
-import SplashScreen from '@/linkloop/src/components/SplashScreen';
+import SplashScreen from '@/components/SplashScreen';
 
 const LinkLoopDark = {
   ...DarkTheme,
