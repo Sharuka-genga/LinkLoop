@@ -1,30 +1,88 @@
-import { Stack } from "expo-router";
-import { View, StyleSheet } from "react-native";
-import { usePathname } from "expo-router";
-import { useState } from "react";
-import NavBar from "../components/NavBar";
-import SplashScreen from "../components/SplashScreen";
+import { DarkTheme, ThemeProvider } from '@react-navigation/native';
+import { Stack, useRouter, useSegments } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState } from 'react';
+import 'react-native-reanimated';
+import 'react-native-url-polyfill/auto';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Pages where navbar should NOT show
-const HIDE_NAV = ["/category", "/subcategory", "/event-form", "/suggested-participants"];
+import { BG } from '@/constants/theme';
+import { AuthProvider, useAuth } from '@/context/auth-context';
+import SplashScreen from '@/linkloop/src/components/SplashScreen';
 
-export default function Layout() {
-  const pathname = usePathname();
-  const showNav = !HIDE_NAV.includes(pathname);
-  const [isSplashVisible, setIsSplashVisible] = useState(true);
+const LinkLoopDark = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    background: BG.main,
+    card: BG.card,
+    border: BG.border,
+    primary: '#818CF8',
+    text: '#F1F5F9',
+  },
+};
+
+function RootNavigator() {
+  const { session, profile, loading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
+
+  // Read the onboarding flag from AsyncStorage once on mount
+  useEffect(() => {
+    // 🔧 DEV ONLY: Uncomment the line below to reset onboarding on every launch for testing.
+    // Comment it back out before releasing to production!
+    AsyncStorage.removeItem('hasSeenOnboarding'); // 🔧 DEV ONLY — comment out before release!
+
+    AsyncStorage.getItem('hasSeenOnboarding').then((value) => {
+      setHasSeenOnboarding(value === 'true');
+      setOnboardingChecked(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (loading || !onboardingChecked) return;
+
+    const inAuthGroup = segments[0] === '(auth)';
+
+    if (!session) {
+      // First-time user → show onboarding, then login
+      if (!hasSeenOnboarding && !inAuthGroup) {
+        router.replace('/(auth)/onboarding' as any);
+      } else if (hasSeenOnboarding && !inAuthGroup) {
+        // Returning but not logged in → skip onboarding, go to login
+        router.replace('/(auth)/login' as any);
+      }
+    } else if (session && inAuthGroup) {
+      // Logged-in user → skip onboarding, go to tabs (interests must be selected)
+      const hasCompletedOnboarding =
+        profile?.interests && profile.interests.length > 0;
+      if (hasCompletedOnboarding) {
+        router.replace('/(tabs)' as any);
+      }
+    }
+  }, [session, profile, loading, segments, onboardingChecked, hasSeenOnboarding]);
 
   return (
-    <View style={styles.container}>
-      <Stack screenOptions={{ headerShown: false }} />
-      {showNav && !isSplashVisible && <NavBar />}
-      
-      {isSplashVisible && (
-        <SplashScreen onFinish={() => setIsSplashVisible(false)} />
-      )}
-    </View>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+    </Stack>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#080E1C" },
-});
+export default function RootLayout() {
+  const [showSplash, setShowSplash] = useState(true);
+
+  return (
+    <AuthProvider>
+      <ThemeProvider value={LinkLoopDark}>
+        <RootNavigator />
+        <StatusBar style="light" />
+        {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
+      </ThemeProvider>
+    </AuthProvider>
+  );
+}
