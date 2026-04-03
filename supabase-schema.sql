@@ -32,7 +32,71 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- 2. Activities table (tracks all user activities for engagement scoring)
+-- 2. Events table (activity engine — stores created events)
+CREATE TABLE IF NOT EXISTS events (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  creator_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  title TEXT NOT NULL,
+  category_id TEXT NOT NULL,
+  category_label TEXT DEFAULT '',
+  category_color TEXT DEFAULT '',
+  subcategory_id TEXT,
+  subcategory_label TEXT,
+  custom_activity TEXT,
+  location_type TEXT DEFAULT 'inside',
+  location TEXT DEFAULT '',
+  event_date DATE NOT NULL,
+  event_time TEXT NOT NULL,
+  people_needed INTEGER DEFAULT 4,
+  join_mode TEXT DEFAULT 'direct' CHECK (join_mode IN ('direct', 'request')),
+  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'cancelled', 'completed')),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_creator ON events(creator_id);
+CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);
+CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at);
+
+-- 2b. Event Invitations table
+CREATE TABLE IF NOT EXISTS event_invitations (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_id UUID REFERENCES events(id) ON DELETE CASCADE NOT NULL,
+  sender_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  receiver_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined')),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(event_id, receiver_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_invitations_event ON event_invitations(event_id);
+CREATE INDEX IF NOT EXISTS idx_invitations_receiver ON event_invitations(receiver_id);
+
+-- 2c. Event Participants table
+CREATE TABLE IF NOT EXISTS event_participants (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_id UUID REFERENCES events(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  joined_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(event_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_participants_event ON event_participants(event_id);
+CREATE INDEX IF NOT EXISTS idx_participants_user ON event_participants(user_id);
+
+-- 2d. Event Join Requests (for 'request' mode events)
+CREATE TABLE IF NOT EXISTS event_requests (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_id UUID REFERENCES events(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined')),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(event_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_requests_event ON event_requests(event_id);
+CREATE INDEX IF NOT EXISTS idx_requests_user ON event_requests(user_id);
+
+-- 3. Activities table (tracks all user activities for engagement scoring)
 CREATE TABLE IF NOT EXISTS activities (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
@@ -130,8 +194,8 @@ ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sos_alerts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trusted_contacts ENABLE ROW LEVEL SECURITY;
 
--- Profiles: users can read/update their own profile
-CREATE POLICY "Users can view own profile" ON profiles FOR SELECT USING (auth.uid() = id);
+-- Profiles: all authenticated users can read any profile (needed for participant suggestions)
+CREATE POLICY "Authenticated users can view profiles" ON profiles FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
 CREATE POLICY "Users can insert own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
@@ -155,6 +219,46 @@ CREATE POLICY "Users can view own SOS alerts" ON sos_alerts FOR SELECT USING (au
 CREATE POLICY "Users can view own contacts" ON trusted_contacts FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert own contacts" ON trusted_contacts FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can delete own contacts" ON trusted_contacts FOR DELETE USING (auth.uid() = user_id);
+
+-- Events: authenticated users can view active events; only creator can insert/delete
+ALTER TABLE events ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Authenticated users can view active events" ON events FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can insert own events" ON events FOR INSERT WITH CHECK (auth.uid() = creator_id);
+CREATE POLICY "Users can delete own events" ON events FOR DELETE USING (auth.uid() = creator_id);
+CREATE POLICY "Users can update own events" ON events FOR UPDATE USING (auth.uid() = creator_id);
+
+-- Event Invitations: sender can insert; receiver can view/update their invitations
+ALTER TABLE event_invitations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can insert invitations" ON event_invitations FOR INSERT WITH CHECK (auth.uid() = sender_id);
+CREATE POLICY "Users can view their invitations" ON event_invitations FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+CREATE POLICY "Receivers can update invitation status" ON event_invitations FOR UPDATE USING (auth.uid() = receiver_id);
+
+-- Event Participants: authenticated users can view; users can join themselves
+ALTER TABLE event_participants ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Anyone can view participants" ON event_participants FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can join events" ON event_participants FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can leave events" ON event_participants FOR DELETE USING (auth.uid() = user_id);
+
+-- Event Requests: authenticated users can view their own; hosts can view/update
+ALTER TABLE event_requests ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view own requests" ON event_requests FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own requests" ON event_requests FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Hosts can view/update requests" ON event_requests FOR ALL USING (
+  EXISTS (SELECT 1 FROM events WHERE id = event_id AND creator_id = auth.uid())
+);
+
+-- Trigger to award points on joining
+CREATE OR REPLACE FUNCTION public.handle_event_join()
+RETURNS TRIGGER AS $$
+BEGIN
+  PERFORM increment_engagement_score(NEW.user_id, 10);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_event_join
+  AFTER INSERT ON event_participants
+  FOR EACH ROW EXECUTE FUNCTION public.handle_event_join();
 
 -- ============================================================
 -- STORAGE  —  Avatar bucket for profile pictures
