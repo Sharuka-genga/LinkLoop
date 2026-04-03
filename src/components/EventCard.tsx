@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { View, Text, StyleSheet, Image, TouchableOpacity, Alert } from "react-native";
+import { View, Text, StyleSheet, Image, TouchableOpacity, Alert, type ImageStyle, type ViewStyle, type TextStyle } from "react-native";
 import { MapPin, Clock, Users, ChevronRight, Zap, MessageCircle, CheckCircle, Pencil, Trash2 } from "lucide-react-native";
 import { deleteEvent, joinEvent, requestToJoin, checkIfJoined } from "@/lib/events";
 
@@ -181,10 +181,13 @@ export default function EventCard({
       {/* Creator row */}
       {creatorName && (
         <View style={styles.creatorRow}>
-          <Image
-            source={{ uri: creatorAvatar || `https://i.pravatar.cc/150?u=${creatorId}` }}
-            style={styles.avatar}
-          />
+          {creatorAvatar ? (
+            <Image source={{ uri: creatorAvatar }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarFallback]}>
+              <Text style={styles.avatarLetter}>{creatorName.charAt(0).toUpperCase()}</Text>
+            </View>
+          )}
           <Text style={styles.creatorName}>{creatorName}</Text>
           <Text style={styles.hostLabel}>{isHost ? "YOU" : "HOST"}</Text>
         </View>
@@ -346,7 +349,9 @@ const styles = StyleSheet.create({
   creatorRow: {
     flexDirection: "row", alignItems: "center", gap: 9, marginBottom: 10,
   },
-  avatar: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5 },
+  avatar: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, borderColor: "#1E2A40" },
+  avatarFallback: { backgroundColor: "#1E2A40", alignItems: "center", justifyContent: "center" },
+  avatarLetter: { fontSize: 13, fontWeight: "800", color: "#818CF8" },
   creatorName: { fontSize: 13, fontWeight: "700", color: "#CBD5E1", flex: 1 },
   hostLabel: {
     fontSize: 9, fontWeight: "800", color: "#475569",

@@ -16,6 +16,8 @@ type User = {
   profile_picture_url: string;
   interests: string[];
   engagement_score: number;
+  faculty: string;
+  match_reason: string;
 };
 
 // ─── Bubble positions: 6 in a circle ─────────────────────────────────────────
@@ -105,7 +107,8 @@ function Bubble({
   const pulseScale = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] });
   const pulseOpacity = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 0] });
 
-  const avatarUri = user.profile_picture_url || `https://i.pravatar.cc/150?u=${user.id}`;
+  const hasAvatar = !!user.profile_picture_url;
+  const initial = (user.full_name || "?").charAt(0).toUpperCase();
 
   return (
     <Animated.View
@@ -157,7 +160,13 @@ function Bubble({
           onPress={onPress}
           activeOpacity={0.85}
         >
-          <Image source={{ uri: avatarUri }} style={styles.bubbleImg} />
+          {hasAvatar ? (
+            <Image source={{ uri: user.profile_picture_url }} style={styles.bubbleImg} />
+          ) : (
+            <View style={styles.bubbleFallback}>
+              <Text style={[styles.bubbleFallbackLetter, { color }]}>{initial}</Text>
+            </View>
+          )}
 
           {/* Sent overlay */}
           {isSent && (
@@ -202,10 +211,11 @@ export default function SuggestedParticipants() {
   const refreshSpin = useRef(new Animated.Value(0)).current;
 
   const loadSuggested = async () => {
+    if (!eventId) return;
     setLoading(true);
     try {
-      const data = await getSuggestedUsers(categoryId || "sports");
-      setUsers(data || []);
+      const data = await getSuggestedUsers(eventId, 6);
+      setUsers((data || []).slice(0, 6));
     } catch (err) {
       console.error(err);
     } finally {
@@ -215,7 +225,7 @@ export default function SuggestedParticipants() {
 
   useEffect(() => {
     loadSuggested();
-  }, [categoryId]);
+  }, [eventId]);
 
   const sentCount = Object.values(inviteStatus).filter((s) => s === "sent").length;
 
@@ -254,13 +264,21 @@ export default function SuggestedParticipants() {
   };
 
   const handleInvite = async (userId: string, userName: string) => {
-    if (!eventId) return;
+    if (!eventId) {
+      Alert.alert("Error", "Missing Event ID. Please go back and try again.");
+      return;
+    }
     try {
       await sendInvitation(eventId, userId);
       setInviteStatus((p) => ({ ...p, [userId]: "sent" }));
       setSelected(null);
-    } catch (err) {
-      Alert.alert("Error", "Could not send invitation.");
+    } catch (err: any) {
+      if (err?.code === "23505") {
+        setInviteStatus((p) => ({ ...p, [userId]: "sent" }));
+        setSelected(null);
+      } else {
+        Alert.alert("Error", "Could not send invitation. Try again.");
+      }
     }
   };
 
@@ -351,10 +369,16 @@ export default function SuggestedParticipants() {
       >
         {selectedUser && (
           <>
-            <Image
-              source={{ uri: selectedUser.profile_picture_url || `https://i.pravatar.cc/150?u=${selectedUser.id}` }}
-              style={[styles.infoPanelAvatar, { borderColor: color }]}
-            />
+            {selectedUser.profile_picture_url ? (
+              <Image
+                source={{ uri: selectedUser.profile_picture_url }}
+                style={[styles.infoPanelAvatar, { borderColor: color }]}
+              />
+            ) : (
+              <View style={[styles.infoPanelAvatar, styles.infoPanelAvatarFallback, { borderColor: color }]}>
+                <Text style={[styles.infoPanelAvatarLetter, { color }]}>{(selectedUser.full_name || "?").charAt(0).toUpperCase()}</Text>
+              </View>
+            )}
             <View style={styles.infoPanelInfo}>
               <Text style={styles.infoPanelName}>{selectedUser.full_name}</Text>
               <View style={styles.infoPanelMeta}>
@@ -362,12 +386,13 @@ export default function SuggestedParticipants() {
                 <Text style={styles.infoPanelRating}>{(selectedUser.engagement_score / 10).toFixed(1)}</Text>
                 <Text style={styles.infoPanelSep}>·</Text>
                 <Text style={styles.infoPanelMetaText}>
-                  SLIIT Student
+                  {selectedUser.faculty}
                 </Text>
               </View>
-              <Text style={styles.infoPanelInterests} numberOfLines={1}>
-                {selectedUser.interests?.join(", ") || "No interests listed"}
-              </Text>
+              <View style={styles.matchReasonPill}>
+                <Zap size={9} color="#818CF8" fill="#818CF8" />
+                <Text style={styles.matchReasonText}>{selectedUser.match_reason}</Text>
+              </View>
             </View>
             <View style={styles.infoPanelActions}>
               <TouchableOpacity
@@ -490,6 +515,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#141B2D",
   },
   bubbleImg: { width: "100%", height: "100%" },
+  bubbleFallback: { width: "100%", height: "100%", alignItems: "center", justifyContent: "center", backgroundColor: "#0F172A" },
+  bubbleFallbackLetter: { fontSize: 28, fontWeight: "900" },
   sentOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center", justifyContent: "center",
@@ -511,12 +538,20 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   infoPanelAvatar: { width: 48, height: 48, borderRadius: 24, borderWidth: 2.5 },
+  infoPanelAvatarFallback: { backgroundColor: "#0F172A", alignItems: "center", justifyContent: "center" },
+  infoPanelAvatarLetter: { fontSize: 20, fontWeight: "900" },
   infoPanelInfo: { flex: 1 },
   infoPanelName: { fontSize: 15, fontWeight: "800", color: "#F1F5F9", marginBottom: 3 },
   infoPanelMeta: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 3 },
   infoPanelRating: { fontSize: 11, color: "#FBBF24", fontWeight: "700" },
   infoPanelSep: { fontSize: 11, color: "#334155" },
   infoPanelMetaText: { fontSize: 11, color: "#475569", fontWeight: "500" },
+  matchReasonPill: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    backgroundColor: "rgba(129,140,248,0.1)", paddingHorizontal: 6,
+    paddingVertical: 3, borderRadius: 6, alignSelf: "flex-start", marginTop: 2
+  },
+  matchReasonText: { fontSize: 10, color: "#818CF8", fontWeight: "700", textTransform: "uppercase" },
   infoPanelInterests: { fontSize: 10, color: "#334155", fontWeight: "500" },
   infoPanelActions: { flexDirection: "column", gap: 6, alignItems: "center" },
   inviteBtn: {

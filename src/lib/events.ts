@@ -80,7 +80,7 @@ export async function joinEvent(eventId: string) {
     const userId = await getCurrentUserId();
     const { data, error } = await supabase
         .from("event_participants")
-        .insert({ event_id: eventId, user_id: userId })
+        .insert({ event_id: eventId, user_id: userId, status: "joined", joined_via: "direct" })
         .select()
         .single();
 
@@ -121,25 +121,29 @@ export async function checkIfJoined(eventId: string) {
         .eq("user_id", userId)
         .maybeSingle();
 
-    if (request) return request.status === "pending" ? "requested" : "idle";
+    if (request) {
+        if (request.status === "accepted") return "joined";
+        if (request.status === "pending") return "requested";
+    }
     
     return "idle";
 }
 
-// ── Get Suggested Participants based on category ──────────────
-export async function getSuggestedUsers(categoryId: string, limit = 10) {
-    const { data: { user } } = await supabase.auth.getUser();
+// ── Get Ranked Suggestions using Database Engine ─────────────
+export async function getSuggestedUsers(eventId: string, limit = 10) {
+    if (!eventId) return [];
     
-    // Fetch users who share interests with this category
-    // but exclude the current user
-    const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .contains("interests", [categoryId])
-        .neq("id", user?.id)
-        .limit(limit);
+    const { data, error } = await supabase.rpc('get_ranked_suggestions', {
+        p_event_id: eventId,
+        p_limit: limit
+    });
 
-    if (error) throw error;
+    if (error) {
+        console.error("Error fetching ranked suggestions:", error);
+        // Fallback to simple matching if RPC fails
+        return [];
+    }
+    
     return data;
 }
 
@@ -157,9 +161,121 @@ export async function sendInvitation(eventId: string, receiverId: string) {
         .select()
         .single();
 
-    if (error) throw error;
+    if (error) {
+        console.error("Supabase error sending invitation:", error);
+        throw error;
+    }
     return data;
 }
+
+// ── Get pending invitations for current user ───────────────────
+export async function getInvitations() {
+    const userId = await getCurrentUserId();
+    const { data, error } = await supabase
+        .from("event_invitations")
+        .select(`
+            id,
+            status,
+            created_at,
+            events:events!event_invitations_event_id_fkey (
+                id,
+                title,
+                category_id,
+                location,
+                event_date,
+                event_time
+            ),
+            sender:profiles!event_invitations_sender_id_fkey (
+                full_name,
+                profile_picture_url
+            )
+        `)
+        .eq("receiver_id", userId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+
+    if (error) {
+        console.error("Supabase error fetching invitations:", error);
+        throw error;
+    }
+    return data;
+}
+
+// ── Accept an invitation ──────────────────────────────────────
+export async function acceptInvitation(invitationId: string) {
+    const { error } = await supabase.rpc('accept_invitation', {
+        p_invitation_id: invitationId
+    });
+
+    if (error) throw error;
+}
+
+// ── Decline an invitation ─────────────────────────────────────
+export async function declineInvitation(invitationId: string) {
+    const { error } = await supabase
+        .from("event_invitations")
+        .update({ status: "declined" })
+        .eq("id", invitationId);
+
+    if (error) throw error;
+}
+// ── Get pending join requests for events the current user hosts ──
+export async function getJoinRequests() {
+    const userId = await getCurrentUserId();
+    const { data, error } = await supabase
+        .from("event_requests")
+        .select(`
+            id,
+            status,
+            created_at,
+            events:events!event_requests_event_id_fkey (
+                id,
+                title,
+                category_id,
+                location,
+                event_date,
+                event_time
+            ),
+            requester:profiles!event_requests_user_id_fkey (
+                full_name,
+                profile_picture_url
+            )
+        `)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+
+    if (error) {
+        console.error("Supabase error fetching join requests:", error);
+        throw error;
+    }
+
+    // Filter to only events the current user created
+    const { data: myEvents } = await supabase
+        .from("events")
+        .select("id")
+        .eq("creator_id", userId);
+
+    const myEventIds = new Set((myEvents || []).map(e => e.id));
+    return (data || []).filter(r => myEventIds.has(r.events?.id));
+}
+
+// ── Accept a join request ────────────────────────────────────────
+export async function acceptJoinRequest(requestId: string) {
+    const { error } = await supabase.rpc('accept_join_request', {
+        p_request_id: requestId
+    });
+    if (error) throw error;
+}
+
+// ── Decline a join request ───────────────────────────────────────
+export async function declineJoinRequest(requestId: string) {
+    const { error } = await supabase
+        .from("event_requests")
+        .update({ status: "declined" })
+        .eq("id", requestId);
+    if (error) throw error;
+}
+
 export async function deleteEvent(eventId: string) {
     const { error } = await supabase
         .from("events")

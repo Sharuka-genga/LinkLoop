@@ -1,89 +1,73 @@
 -- ============================================================
--- LinkLoop Database Fix: Data Cleanup & Relationship Repair
+-- LinkLoop Master Database Repair & Relationship Enforcer
 -- Run this in your Supabase SQL Editor
 -- ============================================================
 
--- 1. CLEANUP: Delete any events that point to non-existent profiles
--- This fixes the "violates foreign key constraint" error
-DELETE FROM public.events 
-WHERE creator_id NOT IN (SELECT id FROM public.profiles);
+-- 1. DROP and RECREATE to ensure a clean slate
+-- This removes old broken relationships and clears the cache
+DROP TABLE IF EXISTS public.event_invitations CASCADE;
 
--- 2. REPAIR: Ensure the Foreign Key relationship exists for the feed join
-DO $$
-BEGIN
-    -- Drop the constraint if it exists to recreate it cleanly
-    ALTER TABLE public.events DROP CONSTRAINT IF EXISTS events_creator_id_fkey;
-    
-    -- Add the clean constraint
-    ALTER TABLE public.events 
-    ADD CONSTRAINT events_creator_id_fkey 
-    FOREIGN KEY (creator_id) REFERENCES public.profiles(id) 
-    ON DELETE CASCADE;
-END $$;
-
--- 3. STRUCTURE: Create Event Participants table (if not exists)
-CREATE TABLE IF NOT EXISTS event_participants (
+-- 2. CREATE Table with explicit Foreign Key Names
+CREATE TABLE public.event_invitations (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  event_id UUID REFERENCES events(id) ON DELETE CASCADE NOT NULL,
-  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-  joined_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(event_id, user_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_participants_event ON event_participants(event_id);
-CREATE INDEX IF NOT EXISTS idx_participants_user ON event_participants(user_id);
-
--- 4. STRUCTURE: Create Event Join Requests table (if not exists)
-CREATE TABLE IF NOT EXISTS event_requests (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  event_id UUID REFERENCES events(id) ON DELETE CASCADE NOT NULL,
-  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  event_id UUID REFERENCES public.events(id) ON DELETE CASCADE NOT NULL,
+  sender_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  receiver_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined')),
   created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(event_id, user_id)
+  UNIQUE(event_id, receiver_id)
 );
 
--- 5. SECURITY: Enable RLS and add Policies
-ALTER TABLE event_participants ENABLE ROW LEVEL SECURITY;
-ALTER TABLE event_requests ENABLE ROW LEVEL SECURITY;
+-- 3. ENFORCE specific relationship names for the PostgREST API
+-- The name of the constraint is what Supabase uses as the "hint"
+ALTER TABLE public.event_invitations DROP CONSTRAINT IF EXISTS sender_id;
+ALTER TABLE public.event_invitations ADD CONSTRAINT sender_id FOREIGN KEY (sender_id) REFERENCES public.profiles(id);
 
--- Participants Policies
-DROP POLICY IF EXISTS "Anyone can view participants" ON event_participants;
-CREATE POLICY "Anyone can view participants" ON event_participants FOR SELECT USING (auth.role() = 'authenticated');
+ALTER TABLE public.event_invitations DROP CONSTRAINT IF EXISTS receiver_id;
+ALTER TABLE public.event_invitations ADD CONSTRAINT receiver_id FOREIGN KEY (receiver_id) REFERENCES public.profiles(id);
 
-DROP POLICY IF EXISTS "Users can join events" ON event_participants;
-CREATE POLICY "Users can join events" ON event_participants FOR INSERT WITH CHECK (auth.uid() = user_id);
+-- 4. Re-enable Security (RLS)
+ALTER TABLE public.event_invitations ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Users can leave events" ON event_participants;
-CREATE POLICY "Users can leave events" ON event_participants FOR DELETE USING (auth.uid() = user_id);
+-- Select: Both sender and receiver can see it
+CREATE POLICY "Users can view their invitations" ON public.event_invitations 
+FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
 
--- Requests Policies
-DROP POLICY IF EXISTS "Users can view own requests" ON event_requests;
-CREATE POLICY "Users can view own requests" ON event_requests FOR SELECT USING (auth.uid() = user_id);
+-- Insert: Only the sender can create it
+CREATE POLICY "Users can insert invitations" ON public.event_invitations 
+FOR INSERT WITH CHECK (auth.uid() = sender_id);
 
-DROP POLICY IF EXISTS "Users can insert own requests" ON event_requests;
-CREATE POLICY "Users can insert own requests" ON event_requests FOR INSERT WITH CHECK (auth.uid() = user_id);
+-- Update: Only the receiver can accept/decline
+CREATE POLICY "Receivers can update invitation status" ON public.event_invitations 
+FOR UPDATE USING (auth.uid() = receiver_id);
 
-DROP POLICY IF EXISTS "Hosts can view/update requests" ON event_requests;
-CREATE POLICY "Hosts can view/update requests" ON event_requests FOR ALL USING (
-  EXISTS (SELECT 1 FROM events WHERE id = event_id AND creator_id = auth.uid())
-);
-
--- 6. AUTOMATION: Award points on joining
-CREATE OR REPLACE FUNCTION public.handle_event_join()
-RETURNS TRIGGER AS $$
+-- 5. Atomic Accept Invitation Function (RPC)
+CREATE OR REPLACE FUNCTION accept_invitation(p_invitation_id UUID)
+RETURNS VOID AS $$
+DECLARE
+    v_event_id UUID;
+    v_user_id UUID;
 BEGIN
-  UPDATE profiles
-  SET engagement_score = engagement_score + 10,
-      updated_at = now()
-  WHERE id = NEW.user_id;
-  RETURN NEW;
+    -- Get details and ensure pending
+    SELECT event_id, receiver_id INTO v_event_id, v_user_id
+    FROM public.event_invitations 
+    WHERE id = p_invitation_id AND status = 'pending';
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Invitation not found or already processed';
+    END IF;
+
+    -- Mark as accepted
+    UPDATE public.event_invitations SET status = 'accepted' WHERE id = p_invitation_id;
+
+    -- Add to participants
+    INSERT INTO public.event_participants (event_id, user_id)
+    VALUES (v_event_id, v_user_id)
+    ON CONFLICT DO NOTHING;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-DROP TRIGGER IF EXISTS on_event_join ON event_participants;
-CREATE TRIGGER on_event_join
-  AFTER INSERT ON event_participants
-  FOR EACH ROW EXECUTE FUNCTION public.handle_event_join();
+-- 6. Force PostgREST to reload the schema cache
+NOTIFY pgrst, 'reload schema';
 
-RAISE NOTICE '✅ Database cleaned and relationship repair successful!';
+RAISE NOTICE '✅ MASTER DATABASE REPAIR COMPLETE';
