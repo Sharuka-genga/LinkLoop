@@ -13,9 +13,9 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "8.4.4",
     "@react-native-picker/picker": "2.11.1",
-    "@react-navigation/bottom-tabs": "^7.15.9",
+    "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.9.14",
-    "@react-navigation/native": "^7.2.2",
+    "@react-navigation/native": "^7.1.8",
     "@supabase/supabase-js": "^2.96.0",
     "expo": "~54.0.33",
     "expo-av": "^16.0.8",
@@ -26,6 +26,7 @@
     "expo-linking": "~8.0.11",
     "expo-location": "~19.0.8",
     "expo-router": "~6.0.23",
+    "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
     "expo-symbols": "~1.0.8",
     "expo-system-ui": "~6.0.9",
@@ -39,7 +40,8 @@
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
     "react-native-svg": "15.12.1",
-    "react-native-url-polyfill": "^3.0.0"
+    "react-native-url-polyfill": "^3.0.0",
+    "react-native-worklets": "^0.5.1"
   },
   "devDependencies": {
     "@expo/ngrok": "^4.1.3",
