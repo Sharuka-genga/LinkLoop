@@ -118,7 +118,7 @@ export default function EventForm() {
           text: "View Participants",
           onPress: () => {
             router.push({
-              pathname: "/suggested-participants",
+              pathname: "/suggested-participants" as any,
               params: { categoryId, categoryLabel, categoryColor, eventTitle: title, eventId: event.id },
             });
           }

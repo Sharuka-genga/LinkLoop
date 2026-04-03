@@ -127,7 +127,7 @@ export default function SubcategorySelect() {
   const handleContinue = () => {
     if (!selected) return;
     router.push({
-      pathname: "/event-form",
+      pathname: "/event-form" as any,
       params: {
         categoryId, categoryLabel, categoryColor,
         subcategoryId: selected,
