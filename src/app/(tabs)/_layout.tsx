@@ -14,6 +14,7 @@ export default function TabLayout() {
           tabBarStyle: { display: 'none' },
         }}>
         <Tabs.Screen name="index" />
+        <Tabs.Screen name="ai" />
         <Tabs.Screen name="bookings" />
         <Tabs.Screen name="sos" />
         <Tabs.Screen name="activities" />

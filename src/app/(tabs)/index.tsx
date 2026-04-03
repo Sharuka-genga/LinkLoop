@@ -8,12 +8,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Search, SlidersHorizontal, Bell } from 'lucide-react-native';
+import { Search, SlidersHorizontal, Bell, BookOpen } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 
 import { Accent, BG, BR, FW, TX } from '@/constants/theme';
+import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/auth-context';
 import { getEvents } from '@/lib/events';
 import { supabase } from '@/lib/supabase';
@@ -76,6 +77,7 @@ function getGreeting() {
 // ── Screen ─────────────────────────────────────────────────────
 export default function HomeScreen() {
   const { user, profile } = useAuth();
+  const router = useRouter();
 
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -154,6 +156,13 @@ export default function HomeScreen() {
             </Text>
           </View>
           <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={styles.notifBtn}
+              onPress={() => router.push('/bookings' as any)}
+              activeOpacity={0.7}
+            >
+              <BookOpen size={20} color="#CBD5E1" strokeWidth={2} />
+            </TouchableOpacity>
             <TouchableOpacity style={styles.notifBtn}>
               <Bell size={20} color="#CBD5E1" strokeWidth={2} />
               <View style={styles.notifDot} />

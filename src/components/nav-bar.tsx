@@ -1,13 +1,14 @@
-import { Home, Calendar, Plus, BookOpen, User } from 'lucide-react-native';
+import { Home, Calendar, Plus, User, Sparkles } from 'lucide-react-native';
 import { usePathname, useRouter } from 'expo-router';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 type NavItem = {
-  icon: React.ComponentType<{ size: number; color: string; strokeWidth: number }>;
+  icon: React.ComponentType<{ size: number; color: string; strokeWidth: number; fill?: string }>;
   label: string;
   route: string;
   active: boolean;
   isCreate?: boolean;
+  isAI?: boolean;
 };
 
 export default function NavBar() {
@@ -18,7 +19,7 @@ export default function NavBar() {
     { icon: Home,     label: 'Home',       route: '/',           active: pathname === '/' },
     { icon: Calendar, label: 'Activities', route: '/activities', active: pathname === '/activities' },
     { icon: Plus,     label: 'Create',     route: '/category',   active: pathname === '/category', isCreate: true },
-    { icon: BookOpen, label: 'Bookings',   route: '/bookings',   active: pathname === '/bookings' },
+    { icon: Sparkles, label: 'AI',         route: '/ai',         active: pathname === '/ai', isAI: true },
     { icon: User,     label: 'Profile',    route: '/profile',    active: pathname === '/profile' },
   ];
 
@@ -36,6 +37,24 @@ export default function NavBar() {
                 activeOpacity={0.85}
               >
                 <Icon size={22} color="#0F172A" strokeWidth={2.5} />
+              </TouchableOpacity>
+            );
+          }
+          if (item.isAI) {
+            return (
+              <TouchableOpacity
+                key={item.label}
+                style={styles.navItem}
+                onPress={() => router.push(item.route as any)}
+                activeOpacity={0.7}
+              >
+                <Icon
+                  size={22}
+                  color={item.active ? '#A78BFA' : '#475569'}
+                  strokeWidth={item.active ? 2.5 : 2}
+                  fill={item.active ? '#A78BFA' : 'transparent'}
+                />
+                {item.active && <View style={[styles.activeDot, { backgroundColor: '#A78BFA' }]} />}
               </TouchableOpacity>
             );
           }
