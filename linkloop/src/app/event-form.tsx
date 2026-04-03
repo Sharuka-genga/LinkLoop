@@ -6,6 +6,7 @@ import {
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { ArrowLeft, Clock, ChevronRight, MapPin, ChevronDown, Check } from "lucide-react-native";
+import { Audio } from "expo-av";
 import { createEvent } from "@/lib/events";
 
 const INSIDE_LOCATIONS = [
@@ -13,7 +14,7 @@ const INSIDE_LOCATIONS = [
   "Auditorium", "Computer lab", "Engineering faculty", "Cafeteria",
   "Lab rooms", "Volleyball court", "Basketball court", "Badminton court",
   "Swimming pool", "Tennis court", "Library", "Study halls",
-  "Student Center", "Common room",
+  "Student Center", "Common room", "Type my own...",
 ];
 
 export default function EventForm() {
@@ -63,6 +64,33 @@ export default function EventForm() {
     return Object.keys(newErrors).length === 0;
   };
 
+  const playSuccessSound = async () => {
+    try {
+      // Configure audio for iOS to play even if on silent (optional but better for feedback)
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        playThroughEarpieceAndroid: false,
+        interruptionModeIOS: 1, // InterruptionModeIOS.DoNotMix
+        allowsRecordingIOS: false,
+      });
+
+      const { sound } = await Audio.Sound.createAsync(
+        require("../../assets/sounds/success.wav"),
+        { shouldPlay: true, volume: 1.0 }
+      );
+      
+      // Auto-unload sound when finished to free memory
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          sound.unloadAsync();
+        }
+      });
+    } catch (e) {
+      console.log("Error playing sound", e);
+    }
+  };
+
   const selectedLocation = showCustomInput ? customInsideLocation : insideLocation;
 
   const handlePost = async () => {
@@ -82,10 +110,20 @@ export default function EventForm() {
         eventDate: date, eventTime: time, peopleNeeded, joinMode,
       });
 
-      router.push({
-        pathname: "/suggested-participants",
-        params: { categoryId, categoryLabel, categoryColor, eventTitle: title, eventId: event.id },
-      });
+      await playSuccessSound();
+      Alert.alert(
+        "Successfully Posted!",
+        "Your event is now live and people can start joining or requesting.",
+        [{
+          text: "View Participants",
+          onPress: () => {
+            router.push({
+              pathname: "/suggested-participants",
+              params: { categoryId, categoryLabel, categoryColor, eventTitle: title, eventId: event.id },
+            });
+          }
+        }]
+      );
     } catch (err) {
       Alert.alert("Error", "Failed to post event. Please try again.");
       console.error(err);
@@ -181,14 +219,17 @@ export default function EventForm() {
           <View>
             {/* Custom input if "Type my own" selected */}
             {showCustomInput && (
-              <TextInput
-                placeholder="e.g. Block C Room 204, Lab 3..."
-                placeholderTextColor="#2D3E55"
-                style={[styles.input, { marginBottom: 12 }]}
-                value={customInsideLocation}
-                onChangeText={setCustomInsideLocation}
-                autoFocus
-              />
+              <View style={styles.customLocContainer}>
+                <Text style={styles.customLabel}>TAP TO SPECIFY EXACT SPOT:</Text>
+                <TextInput
+                  placeholder="e.g. Block C Room 204, Lab 3..."
+                  placeholderTextColor="#475569"
+                  style={[styles.input, { borderColor: "#818CF8", borderWidth: 1.5 }]}
+                  value={customInsideLocation}
+                  onChangeText={setCustomInsideLocation}
+                  autoFocus
+                />
+              </View>
             )}
 
             {/* Dropdown Modal */}
@@ -415,8 +456,11 @@ const styles = StyleSheet.create({
   dropdownItemSelected: { backgroundColor: "rgba(129,140,248,0.1)" },
   dropdownItemText: { fontSize: 15, fontWeight: "600", color: "#CBD5E1" },
   dropdownItemTextSelected: { color: "#818CF8", fontWeight: "700" },
-  dropdownItemTypeOwn: { color: "#818CF8", fontStyle: "italic" },
+  dropdownItemTypeOwn: { color: "#818CF8", fontWeight: "800" },
 
+  customLocContainer: { marginBottom: 16, marginTop: -4 },
+  customLabel: { fontSize: 9, fontWeight: "900", color: "#818CF8", letterSpacing: 1, marginBottom: 8, marginLeft: 4 },
+  
   twoCol: { flexDirection: "row", gap: 12 },
   dtBtn: { backgroundColor: "#141B2D", borderWidth: 1, borderColor: "#1E2A40", borderRadius: 14, padding: 14, flexDirection: "row", alignItems: "center", gap: 8 },
   dtText: { fontSize: 13, color: "#CBD5E1", fontWeight: "700", flex: 1 },

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Image, TouchableOpacity, Alert } from "react-na
 import { MapPin, Clock, Users, ChevronRight, Zap, MessageCircle, CheckCircle, Pencil, Trash2 } from "lucide-react-native";
 import { deleteEvent } from "@/lib/events";
 
-const TEST_USER_ID = "00000000-0000-0000-0000-000000000001";
+const TEST_USER_ID = "8d30902c-c3ca-470a-8f4b-b1b545e8f452"; // Kavindu = YOU
 
 type Props = {
   id: string;
@@ -19,6 +19,7 @@ type Props = {
   joinMode?: "direct" | "request";
   spotsLeft?: number;
   totalSpots?: number;
+  subcategoryLabel?: string;
   onDelete?: () => void;
 };
 
@@ -40,7 +41,7 @@ type JoinState = "idle" | "requested" | "joined";
 export default function EventCard({
   id, title, location, date, time, peopleNeeded, category,
   creatorId, creatorName, creatorAvatar,
-  joinMode = "direct", spotsLeft, totalSpots, onDelete,
+  joinMode = "direct", spotsLeft, totalSpots, subcategoryLabel, onDelete,
 }: Props) {
   const cat = CATEGORY_CONFIG[category] ?? CATEGORY_CONFIG.other;
   const isHost = creatorId === TEST_USER_ID;
@@ -96,9 +97,16 @@ export default function EventCard({
     <View style={styles.card}>
       {/* Top row */}
       <View style={styles.topRow}>
-        <View style={[styles.catPill, { backgroundColor: cat.darkColor }]}>
-          <Zap size={10} color={cat.color} strokeWidth={0} fill={cat.color} />
-          <Text style={[styles.catPillText, { color: cat.color }]}>{cat.label.toUpperCase()}</Text>
+        <View style={styles.catRow}>
+          <View style={[styles.catPill, { backgroundColor: cat.darkColor }]}>
+            <Zap size={10} color={cat.color} strokeWidth={0} fill={cat.color} />
+            <Text style={[styles.catPillText, { color: cat.color }]}>{cat.label.toUpperCase()}</Text>
+          </View>
+          {subcategoryLabel && (
+            <View style={styles.subCatPill}>
+              <Text style={styles.subCatText}>{subcategoryLabel}</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.topRight}>
@@ -117,7 +125,7 @@ export default function EventCard({
           {isHost && (
             <View style={styles.hostControls}>
               {/* 3-dot button */}
-              <View>
+              <View style={{ position: "relative", zIndex: 1000 }}>
                 <TouchableOpacity
                   style={styles.threeDotBtn}
                   onPress={() => setShowDropdown(!showDropdown)}
@@ -125,18 +133,14 @@ export default function EventCard({
                   <Text style={styles.threeDotText}>•••</Text>
                 </TouchableOpacity>
 
-                {/* Dropdown menu */}
+                {/* Dropdown menu - rendered here to be inside the zIndex container */}
                 {showDropdown && (
                   <View style={styles.dropdown}>
-                    {/* Edit option */}
                     <TouchableOpacity style={styles.dropdownItem} onPress={handleEdit}>
                       <Pencil size={14} color="#CBD5E1" strokeWidth={2.5} />
                       <Text style={styles.dropdownItemText}>Edit Event</Text>
                     </TouchableOpacity>
-
                     <View style={styles.dropdownDivider} />
-
-                    {/* Delete option */}
                     <TouchableOpacity style={styles.dropdownItem} onPress={handleDelete}>
                       <Trash2 size={14} color="#F87171" strokeWidth={2.5} />
                       <Text style={[styles.dropdownItemText, { color: "#F87171" }]}>Delete Event</Text>
@@ -149,10 +153,10 @@ export default function EventCard({
         </View>
       </View>
 
-      {/* Tap outside to close dropdown */}
+      {/* Tap outside to close dropdown - moved here so it can be behind the dropdown z-index if needed */}
       {showDropdown && (
         <TouchableOpacity
-          style={StyleSheet.absoluteFillObject}
+          style={[StyleSheet.absoluteFillObject, { zIndex: 999 }]}
           onPress={() => setShowDropdown(false)}
           activeOpacity={0}
         />
@@ -162,8 +166,8 @@ export default function EventCard({
       {creatorName && (
         <View style={styles.creatorRow}>
           <Image
-            source={{ uri: creatorAvatar || `https://i.pravatar.cc/80?u=${creatorName}` }}
-            style={[styles.avatar, { borderColor: cat.color }]}
+            source={{ uri: creatorAvatar || (creatorId === TEST_USER_ID ? "https://i.pravatar.cc/150?img=12" : `https://i.pravatar.cc/150?u=${creatorId}`) }}
+            style={styles.avatar}
           />
           <Text style={styles.creatorName}>{creatorName}</Text>
           <Text style={styles.hostLabel}>{isHost ? "YOU" : "HOST"}</Text>
@@ -261,6 +265,7 @@ export default function EventCard({
 
 const styles = StyleSheet.create({
   card: {
+    position: "relative",
     backgroundColor: "#141B2D", borderRadius: 24, padding: 20,
     marginBottom: 16, borderWidth: 1, borderColor: "#1E2A40",
     shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 20,
@@ -273,14 +278,21 @@ const styles = StyleSheet.create({
   },
   topRow: {
     flexDirection: "row", alignItems: "center",
-    justifyContent: "space-between", marginTop: 6, marginBottom: 14,
+    justifyContent: "space-between", marginTop: 4, marginBottom: 14,
   },
+  catRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   topRight: { flexDirection: "row", alignItems: "center", gap: 8 },
   catPill: {
     flexDirection: "row", alignItems: "center",
     paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, gap: 5,
   },
   catPillText: { fontSize: 10, fontWeight: "800", letterSpacing: 1 },
+  subCatPill: {
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.1)",
+  },
+  subCatText: { fontSize: 10, fontWeight: "700", color: "#94A3B8" },
   modePill: {
     flexDirection: "row", alignItems: "center",
     paddingHorizontal: 9, paddingVertical: 5, borderRadius: 20, gap: 5,
@@ -295,11 +307,10 @@ const styles = StyleSheet.create({
   },
   yourEventText: { fontSize: 9, fontWeight: "800", color: "#818CF8", letterSpacing: 1 },
   threeDotBtn: {
-    width: 32, height: 32, borderRadius: 9,
-    backgroundColor: "#1E2A40", borderWidth: 1, borderColor: "#2D3E55",
+    padding: 8, marginRight: -8,
     alignItems: "center", justifyContent: "center",
   },
-  threeDotText: { fontSize: 14, color: "#64748B", letterSpacing: 1, lineHeight: 16 },
+  threeDotText: { fontSize: 18, color: "rgba(148,163,184,0.6)", letterSpacing: 1.5, fontWeight: "900" },
 
   // Dropdown
   dropdown: {

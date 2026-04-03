@@ -4,7 +4,7 @@ import {
   StatusBar, Dimensions, FlatList, Image,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { ArrowLeft, ChevronRight, ChevronLeft, Plus } from "lucide-react-native";
+import { ArrowLeft, Plus } from "lucide-react-native";
 
 const W = Dimensions.get("window").width;
 const H = Dimensions.get("window").height;
@@ -20,19 +20,17 @@ const CATEGORIES = [
   { id: "social", label: "Social / Chill", color: "#F472B6", tagline: "Movie nights, campus walks\nand just hanging out", image: require("../../assets/categories/social.jpeg") },
 ];
 
-const CUSTOM_CARD = {
-  id: "custom", label: "Something Else", color: "#94A3B8",
-  tagline: "Avurudu party, debate practice,\nphotography meetup — anything",
+const CUSTOM_ITEM = {
+  id: "custom", label: "Something Else?", color: "#94A3B8",
+  tagline: "Avurudu party, debate practice,\nphotography meetup — anything goes",
 };
 
-const ALL_ITEMS = [...CATEGORIES, CUSTOM_CARD as any];
+const ALL_ITEMS = [...CATEGORIES, CUSTOM_ITEM as any];
 
 export default function CategorySelect() {
   const router = useRouter();
   const [activeIndex, setActiveIndex] = useState(0);
   const flatRef = useRef<FlatList>(null);
-  const isCustom = activeIndex === ALL_ITEMS.length - 1;
-  const cat = ALL_ITEMS[activeIndex];
 
   const goTo = (idx: number) => {
     flatRef.current?.scrollToIndex({ index: idx, animated: true });
@@ -57,8 +55,51 @@ export default function CategorySelect() {
     }
   };
 
+  const renderItem = ({ item, index }: { item: any; index: number }) => {
+    const isCustom = index === ALL_ITEMS.length - 1;
+
+    return (
+      <TouchableOpacity
+        style={[styles.cardContainer, { width: W }]}
+        onPress={() => handleSelect(item, isCustom)}
+        activeOpacity={0.9}
+      >
+        <View style={isCustom ? [styles.imageWrap, { backgroundColor: "#141B2D", justifyContent: "center", alignItems: "center" }] : styles.imageWrap}>
+          {isCustom ? (
+            <View style={styles.customIconRing}>
+              <Plus size={48} color="#818CF8" strokeWidth={2} />
+            </View>
+          ) : (
+            <>
+              <Image source={item.image} style={styles.cardImage} resizeMode="cover" />
+              <View style={styles.imageDivider} />
+            </>
+          )}
+        </View>
+
+        <View style={styles.cardInfo}>
+          <Text style={styles.cardCounter}>
+            {String(index + 1).padStart(2, "0")} / {String(ALL_ITEMS.length).padStart(2, "0")}
+          </Text>
+          <Text style={styles.cardLabel}>{item.label}</Text>
+          <Text style={styles.cardTagline}>{item.tagline}</Text>
+
+          <View style={styles.controlsRow}>
+            <View style={styles.dotsRow}>
+              {ALL_ITEMS.map((_, i) => (
+                <TouchableOpacity key={i} onPress={() => goTo(i)}>
+                  <View style={[styles.dot, i === activeIndex && { backgroundColor: "#818CF8", width: 22, height: 6 }]} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
 
       {/* Nav overlay */}
@@ -84,125 +125,14 @@ export default function CategorySelect() {
           const idx = Math.round(e.nativeEvent.contentOffset.x / W);
           setActiveIndex(idx);
         }}
-        style={StyleSheet.absoluteFill}
-        renderItem={({ item, index }) => {
-          const isLast = index === ALL_ITEMS.length - 1;
-
-          if (isLast) {
-            return (
-              <TouchableOpacity
-                style={[styles.customCard, { width: W, height: H }]}
-                onPress={() => handleSelect(item, true)}
-                activeOpacity={0.95}
-              >
-                <View style={styles.customIconWrap}>
-                  <View style={styles.customIconRing}>
-                    <Plus size={40} color="#94A3B8" strokeWidth={1.5} />
-                  </View>
-                </View>
-
-                <Text style={styles.cardCounter}>
-                  {String(index + 1).padStart(2, "0")} / {String(ALL_ITEMS.length).padStart(2, "0")}
-                </Text>
-                <View style={[styles.accentLine, { backgroundColor: "#818CF8" }]} />
-                <Text style={[styles.cardLabel, { color: "#F1F5F9" }]}>Something{"\n"}Else?</Text>
-                <Text style={styles.cardTagline}>
-                  Avurudu party, debate practice,{"\n"}photography meetup — anything goes
-                </Text>
-                <View style={styles.customHint}>
-                  <Text style={styles.customHintText}>
-                    Tap anywhere to create a custom event
-                  </Text>
-                </View>
-
-                <View style={styles.controlsRow}>
-                  <View style={styles.dotsRow}>
-                    {ALL_ITEMS.map((_, i) => (
-                      <TouchableOpacity key={i} onPress={() => goTo(i)}>
-                        <View style={[styles.dot, i === activeIndex && { backgroundColor: "#818CF8", width: 20 }]} />
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                  <View style={styles.arrowsRow}>
-                    <TouchableOpacity style={styles.arrowBtn} onPress={() => goTo(activeIndex - 1)}>
-                      <ChevronLeft size={20} color="#fff" strokeWidth={2.5} />
-                    </TouchableOpacity>
-                    <View style={[styles.arrowBtn, { opacity: 0.3 }]}>
-                      <ChevronRight size={20} color="#fff" strokeWidth={2.5} />
-                    </View>
-                  </View>
-                </View>
-
-                {/* Tap hint */}
-                <View style={styles.tapHint}>
-                  <Text style={styles.tapHintText}>TAP CARD TO SELECT</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          }
-
-          return (
-            <TouchableOpacity
-              style={{ width: W, height: H }}
-              onPress={() => handleSelect(item, false)}
-              activeOpacity={0.95}
-            >
-              <Image
-                source={typeof item.image === "string" ? { uri: item.image } : item.image}
-                style={[StyleSheet.absoluteFill, { top: -200 }]}
-                resizeMode="cover"
-              />
-              <View style={styles.topFade} />
-              <View style={styles.cardContent}>
-                <Text style={styles.cardCounter}>
-                  {String(index + 1).padStart(2, "0")} / {String(ALL_ITEMS.length).padStart(2, "0")}
-                </Text>
-                <View style={[styles.accentLine, { backgroundColor: "#818CF8" }]} />
-                <Text style={styles.cardLabel}>{item.label}</Text>
-                <Text style={styles.cardTagline}>{item.tagline}</Text>
-
-                <View style={styles.controlsRow}>
-                  <View style={styles.dotsRow}>
-                    {ALL_ITEMS.map((_, i) => (
-                      <TouchableOpacity key={i} onPress={() => goTo(i)}>
-                        <View style={[styles.dot, i === activeIndex && { backgroundColor: "#818CF8", width: 20 }]} />
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                  <View style={styles.arrowsRow}>
-                    <TouchableOpacity
-                      style={[styles.arrowBtn, { opacity: activeIndex === 0 ? 0.3 : 1 }]}
-                      onPress={() => goTo(activeIndex - 1)}
-                      disabled={activeIndex === 0}
-                    >
-                      <ChevronLeft size={20} color="#fff" strokeWidth={2.5} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.arrowBtn, { opacity: activeIndex === ALL_ITEMS.length - 1 ? 0.3 : 1 }]}
-                      onPress={() => goTo(activeIndex + 1)}
-                      disabled={activeIndex === ALL_ITEMS.length - 1}
-                    >
-                      <ChevronRight size={20} color="#fff" strokeWidth={2.5} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Tap hint */}
-                <View style={styles.tapHint}>
-                  <Text style={styles.tapHintText}>TAP CARD TO SELECT</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          );
-        }}
+        renderItem={renderItem}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#000" },
-
+  safe: { flex: 1, backgroundColor: "#080E1C" },
   navOverlay: {
     position: "absolute", top: 50, left: 0, right: 0, zIndex: 10,
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
@@ -215,77 +145,50 @@ const styles = StyleSheet.create({
   },
   navCenter: { alignItems: "center" },
   navStep: { fontSize: 10, fontWeight: "800", color: "rgba(255,255,255,0.5)", letterSpacing: 2 },
-  navTitle: { fontSize: 15, fontWeight: "800", color: "#fff", marginTop: 2 },
+  navTitle: { fontSize: 16, fontWeight: "800", color: "#fff", marginTop: 2 },
 
-  topFade: {
-    position: "absolute", top: 0, left: 0, right: 0, height: 120,
-    backgroundColor: "rgba(0,0,0,0.35)",
+  cardContainer: { flex: 1 },
+  imageWrap: {
+    width: "100%", height: H * 0.7,
+    position: "relative", backgroundColor: "#000",
   },
-  cardContent: {
-    position: "absolute", bottom: 0, left: 0, right: 0,
-    paddingHorizontal: 28, paddingBottom: 48,
-    backgroundColor: "rgba(0,0,0,0.55)", paddingTop: 40,
+  cardImage: { width: "100%", height: "100%" },
+  imageDivider: {
+    position: "absolute", bottom: 0, left: 0, right: 0, height: 1,
+    backgroundColor: "rgba(255,255,255,0.25)",
   },
+  cardInfo: { flex: 1, paddingHorizontal: 28, paddingTop: 24, paddingBottom: 40 },
   cardCounter: {
-    fontSize: 11, fontWeight: "800", color: "rgba(255,255,255,0.4)",
-    letterSpacing: 2, marginBottom: 14,
+    fontSize: 10, fontWeight: "800", color: "#475569",
+    letterSpacing: 2, marginBottom: 10,
   },
-  accentLine: { width: 40, height: 3, borderRadius: 2, marginBottom: 16 },
   cardLabel: {
-    fontSize: 44, fontWeight: "900", color: "#fff",
-    letterSpacing: -1.5, lineHeight: 48, marginBottom: 12,
+    fontSize: 34, fontWeight: "900", color: "#fff",
+    letterSpacing: -1, lineHeight: 40, marginBottom: 8,
   },
   cardTagline: {
-    fontSize: 16, color: "rgba(255,255,255,0.65)",
-    lineHeight: 24, fontWeight: "500", marginBottom: 28,
+    fontSize: 14, color: "#94A3B8",
+    lineHeight: 20, fontWeight: "500", marginBottom: "auto",
   },
   controlsRow: {
-    flexDirection: "row", justifyContent: "space-between",
-    alignItems: "center", marginBottom: 20,
+    flexDirection: "row", justifyContent: "center",
+    alignItems: "center", paddingTop: 20,
   },
-  dotsRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.25)" },
-  arrowsRow: { flexDirection: "row", gap: 10 },
-  arrowBtn: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    borderWidth: 1, borderColor: "rgba(255,255,255,0.2)",
-    alignItems: "center", justifyContent: "center",
-  },
-
-  tapHint: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 12, paddingVertical: 6,
-    borderRadius: 20, borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-  tapHintText: {
-    fontSize: 10, fontWeight: "800",
-    color: "rgba(255,255,255,0.5)", letterSpacing: 1.5,
-  },
-
-  // Custom card
-  customCard: {
-    backgroundColor: "#080E1C", justifyContent: "flex-end",
-    paddingHorizontal: 28, paddingBottom: 48,
-  },
-  customIconWrap: {
-    position: "absolute", top: 0, left: 0, right: 0, bottom: 320,
-    alignItems: "center", justifyContent: "center",
-  },
+  dotsRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.15)" },
+  
   customIconRing: {
     width: 120, height: 120, borderRadius: 60,
-    borderWidth: 1.5, borderColor: "#1E2A40",
+    borderWidth: 2, borderColor: "#1E2A40",
     alignItems: "center", justifyContent: "center",
-    backgroundColor: "#141B2D",
+    backgroundColor: "#0F172A",
   },
   customHint: {
     backgroundColor: "#141B2D", borderRadius: 14, padding: 14,
-    borderWidth: 1, borderColor: "#1E2A40", marginBottom: 24,
+    borderWidth: 1, borderColor: "#1E2A40", marginTop: 16,
   },
   customHintText: {
     fontSize: 13, color: "#475569", fontWeight: "500",
-    lineHeight: 20, textAlign: "center",
+    lineHeight: 18, textAlign: "center",
   },
 });
