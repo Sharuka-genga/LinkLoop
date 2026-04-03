@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -8,132 +8,117 @@ import {
   TouchableOpacity,
   SafeAreaView,
   StatusBar,
+  ActivityIndicator,
 } from "react-native";
+import {
+  getEventsForSuggestions,
+  getTimeSlotFromEventTime,
+} from "@/lib/events";
 
 type EventItem = {
-  id: number;
+  id: string;
   title: string;
-  category: string;
-  time: string;
-  popularity: number;
-  joined: number;
-  total: number;
+  category_label: string;
   location: string;
-  description: string;
+  event_date: string;
+  event_time: string;
+  people_needed: number;
+  status: string;
+  description?: string;
 };
-
-const eventsData: EventItem[] = [
-  {
-    id: 1,
-    title: "Football Match",
-    category: "Sports",
-    time: "evening",
-    popularity: 4,
-    joined: 7,
-    total: 11,
-    location: "Main Ground",
-    description:
-      "Friendly football session for students who want to join a team and play together.",
-  },
-  {
-    id: 2,
-    title: "Study Group",
-    category: "Study",
-    time: "morning",
-    popularity: 5,
-    joined: 3,
-    total: 5,
-    location: "Library",
-    description:
-      "Group study session with shared notes, discussion, and collaborative preparation.",
-  },
-  {
-    id: 3,
-    title: "Gaming Night",
-    category: "Gaming",
-    time: "night",
-    popularity: 3,
-    joined: 5,
-    total: 8,
-    location: "Student Lounge",
-    description:
-      "Relax and play games with other students in a fun casual environment.",
-  },
-  {
-    id: 4,
-    title: "Campus Meetup",
-    category: "Campus Events",
-    time: "afternoon",
-    popularity: 2,
-    joined: 10,
-    total: 20,
-    location: "Open Area",
-    description:
-      "Meetup to socialize, connect, and take part in campus activities.",
-  },
-  {
-    id: 5,
-    title: "Coffee Hangout",
-    category: "Food & Hangouts",
-    time: "afternoon",
-    popularity: 3,
-    joined: 2,
-    total: 4,
-    location: "Cafeteria",
-    description:
-      "Informal coffee hangout to meet new people and relax after lectures.",
-  },
-  {
-    id: 6,
-    title: "Gym Session",
-    category: "Fitness",
-    time: "evening",
-    popularity: 4,
-    joined: 4,
-    total: 6,
-    location: "Sports Complex",
-    description:
-      "Workout and fitness session for students who want to stay active.",
-  },
-];
 
 export default function Suggestions() {
   const router = useRouter();
   const params = useLocalSearchParams();
+
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const rawInterests =
     typeof params.interests === "string" ? params.interests : "[]";
 
   const selectedInterests: string[] = JSON.parse(rawInterests);
   const selectedTime = typeof params.time === "string" ? params.time : "";
+  const selectedDate = typeof params.date === "string" ? params.date : "";
 
-  const results = eventsData
+  useEffect(() => {
+    loadEvents();
+  }, []);
+
+  const loadEvents = async () => {
+    try {
+      const data = await getEventsForSuggestions();
+      setEvents((data as EventItem[]) || []);
+    } catch (err) {
+      console.error("Failed to load events:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const today = new Date().toLocaleDateString("en-CA");
+
+  const filteredEvents = events.filter((event) => {
+    return event.event_date >= today;
+  });
+
+
+  const MAX_SCORE = 12;
+
+  const scoredEvents = filteredEvents
     .map((event) => {
       let score = 0;
 
-      if (selectedInterests.includes(event.category)) score += 5;
-      if (selectedTime === event.time) score += 3;
-      score += event.popularity;
+      if (selectedInterests.includes(event.category_label)) score += 5;
 
-      if (event.total - event.joined <= 2) score += 2;
+      const eventTimeSlot = getTimeSlotFromEventTime(event.event_time);
+      if (selectedTime === eventTimeSlot) score += 3;
 
-      let reason = "Suggested based on popularity";
+      if (selectedDate && event.event_date === selectedDate) score += 4;
+      
+      const percentage = Math.round((score / MAX_SCORE) * 100);
+
+      let reason = "Suggested based on available events";
 
       if (
-        selectedInterests.includes(event.category) &&
-        selectedTime === event.time
+        selectedInterests.includes(event.category_label) &&
+        selectedTime === eventTimeSlot &&
+        selectedDate &&
+        event.event_date === selectedDate
+      ) {
+        reason = "Best match for your interest, time, and selected date";
+      } else if (
+        selectedInterests.includes(event.category_label) &&
+        selectedTime === eventTimeSlot
       ) {
         reason = "Best match for your interest and time";
-      } else if (selectedInterests.includes(event.category)) {
+      } else if (selectedInterests.includes(event.category_label)) {
         reason = "Matches your selected interest";
-      } else if (selectedTime === event.time) {
+      } else if (selectedTime === eventTimeSlot) {
         reason = "Matches your selected time";
+      } else if (selectedDate && event.event_date === selectedDate) {
+        reason = "Happens on your selected date";
       }
 
-      return { ...event, score, reason };
+      return { ...event, score, percentage, reason, eventTimeSlot };
     })
     .filter((event) => event.score > 0)
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.event_date.localeCompare(b.event_date);
+    });
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <StatusBar barStyle="light-content" backgroundColor="#080E1C" />
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#818CF8" />
+          <Text style={styles.loaderText}>Loading suggestions...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -151,65 +136,56 @@ export default function Suggestions() {
 
           <Text style={styles.title}>Suggested for You</Text>
           <Text style={styles.info}>
-            Based on your preferences, here are the most relevant events.
+            Based on your preferences, here are the most relevant upcoming events.
           </Text>
 
-          {results.length === 0 ? (
+          {scoredEvents.length === 0 ? (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyTitle}>No matching events found</Text>
               <Text style={styles.emptyText}>
-                Try changing your interest or time slot.
+                Try changing your interest, time slot, or date.
               </Text>
             </View>
           ) : (
-            results.map((item, index) => {
-              const percent = Math.min((item.score / 12) * 100, 100);
+            scoredEvents.map((item, index) => (
+              <View key={item.id} style={styles.card}>
+                {index === 0 && <Text style={styles.badge}>🔥 Top Pick</Text>}
 
-              return (
-                <View key={item.id} style={styles.card}>
-                  {index === 0 && <Text style={styles.badge}>🔥 Top Pick</Text>}
+                <Text style={styles.cardTitle}>{item.title}</Text>
 
-                  <Text style={styles.cardTitle}>{item.title}</Text>
+                <Text style={styles.cardSub}>
+                  {item.category_label} • {item.eventTimeSlot}
+                </Text>
 
-                  <Text style={styles.cardSub}>
-                    {item.category} • {item.time}
-                  </Text>
+                <Text style={styles.slot}>📍 {item.location}</Text>
+                <Text style={styles.slot}>📅 {item.event_date}</Text>
+                <Text style={styles.slot}>👥 Needs {item.people_needed} people</Text>
 
-                  <Text style={styles.slot}>
-                    👥 {item.joined}/{item.total} joined
-                  </Text>
+                <Text style={styles.match}>Match: {item.percentage}%</Text>
+                <Text style={styles.reason}>{item.reason}</Text>
 
-                  <Text style={styles.slotLeft}>
-                    {item.total - item.joined} spots left
-                  </Text>
-
-                  <Text style={styles.match}>Match: {Math.round(percent)}%</Text>
-
-                  <Text style={styles.reason}>{item.reason}</Text>
-
-                  <TouchableOpacity
-                    style={styles.viewBtn}
-                    onPress={() =>
-                      router.push(
-                        `/event-details?id=${item.id}&title=${encodeURIComponent(
-                          item.title
-                        )}&category=${encodeURIComponent(
-                          item.category
-                        )}&time=${encodeURIComponent(
-                          item.time
-                        )}&location=${encodeURIComponent(
-                          item.location
-                        )}&description=${encodeURIComponent(
-                          item.description
-                        )}&joined=${item.joined}&total=${item.total}`
-                      )
-                    }
-                  >
-                    <Text style={styles.viewText}>View Details</Text>
-                  </TouchableOpacity>
-                </View>
-              );
-            })
+                <TouchableOpacity
+                  style={styles.viewBtn}
+                  onPress={() =>
+                    router.push(
+                      `/event-details?id=${item.id}&title=${encodeURIComponent(
+                        item.title
+                      )}&category=${encodeURIComponent(
+                        item.category_label
+                      )}&time=${encodeURIComponent(
+                        item.event_time
+                      )}&location=${encodeURIComponent(
+                        item.location || "Campus"
+                      )}&description=${encodeURIComponent(
+                        item.description || "No description available"
+                      )}&joined=0&total=${item.people_needed}`
+                    )
+                  }
+                >
+                  <Text style={styles.viewText}>View Details</Text>
+                </TouchableOpacity>
+              </View>
+            ))
           )}
 
           <TouchableOpacity style={styles.tryBtn} onPress={() => router.back()}>
@@ -238,6 +214,17 @@ const styles = StyleSheet.create({
   wrapper: {
     width: "100%",
     maxWidth: 420,
+  },
+  loaderContainer: {
+    flex: 1,
+    backgroundColor: "#080E1C",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loaderText: {
+    color: "#CBD5E1",
+    marginTop: 12,
+    fontSize: 14,
   },
   back: {
     color: "#818CF8",
@@ -305,12 +292,6 @@ const styles = StyleSheet.create({
     color: "#38BDF8",
     marginTop: 8,
     fontSize: 13,
-  },
-  slotLeft: {
-    color: "#FBBF24",
-    marginTop: 2,
-    fontSize: 13,
-    fontWeight: "600",
   },
   match: {
     color: "#34D399",

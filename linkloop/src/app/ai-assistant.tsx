@@ -8,11 +8,13 @@ import {
   Platform,
   StatusBar,
   Modal,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
 import { ArrowLeft, CalendarDays } from "lucide-react-native";
+import { savePreference } from "@/lib/preferences";
 
 export default function AIAssistant() {
   const router = useRouter();
@@ -22,6 +24,7 @@ export default function AIAssistant() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDate, setShowDate] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const interests = [
     { label: "Sports", emoji: "⚽" },
@@ -67,12 +70,15 @@ export default function AIAssistant() {
     return picked >= today;
   };
 
-  const handleGenerate = () => {
+  
+
+  const handleGenerate = async () => {
     if (selectedInterest.length === 0) {
       setError("Please select at least one interest");
       return;
     }
 
+    console.log("Selected date:", formatDateParam(selectedDate));
     if (!isFutureOrToday(selectedDate)) {
       setError("Past dates are not allowed");
       return;
@@ -84,15 +90,30 @@ export default function AIAssistant() {
     }
 
     setError("");
+    setLoading(true);
 
-    router.push({
-      pathname: "/suggestions",
-      params: {
-        interests: JSON.stringify(selectedInterest),
-        time: selectedTimeSlot,
-        date: formatDateParam(selectedDate),
-      },
-    });
+    try {
+      await savePreference(
+        selectedInterest,
+        formatDateParam(selectedDate),
+        selectedTimeSlot,
+      );
+
+      router.push({
+        pathname: "/suggestions",
+        params: {
+          interests: JSON.stringify(selectedInterest),
+          date: formatDateParam(selectedDate),
+          time: selectedTimeSlot,
+        },
+      });
+    } catch (err: any) {
+      console.error("Failed to save preferences:", err);
+      Alert.alert(
+        "Error",
+        `Failed to save preferences: ${err?.message || "Unknown error"}`
+      );
+    }
   };
 
   return (
@@ -170,11 +191,14 @@ export default function AIAssistant() {
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
         <TouchableOpacity
-          style={styles.button}
+          style={[styles.button, loading && styles.buttonDisabled]}
           onPress={handleGenerate}
           activeOpacity={0.9}
+          disabled={loading}
         >
-          <Text style={styles.buttonText}>Generate Suggestions</Text>
+          <Text style={styles.buttonText}>
+            {loading ? "Saving..." : "Generate Suggestions"}
+          </Text>
         </TouchableOpacity>
 
         <View style={styles.bottomSpace} />
@@ -368,6 +392,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginTop: 4,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
   },
   buttonText: {
     color: "#0F172A",

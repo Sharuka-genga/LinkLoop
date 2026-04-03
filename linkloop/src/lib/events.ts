@@ -80,4 +80,25 @@ export async function deleteEvent(eventId: string) {
     if (error) throw error;
 }
 
+// ── AI Suggestions: Read active events for recommendation ─────────────
+export async function getEventsForSuggestions() {
+    const { data, error } = await supabase
+        .from("events")
+        .select("*")
+        .eq("status", "active")
+        .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return data;
+}
+
+// ── Convert event_time into AI time slot ──────────────────────────────
+export function getTimeSlotFromEventTime(time: string) {
+    const hour = Number(time.split(":")[0]);
+
+    if (hour < 12) return "morning";
+    if (hour < 17) return "afternoon";
+    if (hour < 21) return "evening";
+    return "night";
+}
 

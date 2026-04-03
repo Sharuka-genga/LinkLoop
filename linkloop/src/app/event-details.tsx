@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { sendJoinRequest, cancelJoinRequest } from "@/lib/requests";
 import React, { useState } from "react";
 import {
   View,
@@ -8,6 +9,7 @@ import {
   SafeAreaView,
   StatusBar,
   ScrollView,
+  Alert,
 } from "react-native";
 
 type RequestStatus = "none" | "pending";
@@ -15,6 +17,8 @@ type RequestStatus = "none" | "pending";
 export default function EventDetails() {
   const router = useRouter();
   const params = useLocalSearchParams();
+
+  const eventId = typeof params.id === "string" ? params.id : undefined;
 
   const title = typeof params.title === "string" ? params.title : "Event";
   const category =
@@ -31,15 +35,36 @@ export default function EventDetails() {
 
   const [requestStatus, setRequestStatus] = useState<RequestStatus>("none");
 
-  const handleRequest = () => {
-    if (requestStatus === "none") {
-      setRequestStatus("pending");
-    }
-  };
+  const handleRequest = async () => {
+  if (!eventId) {
+    alert("Invalid event ID");
+    return;
+  }
 
-  const handleCancelRequest = () => {
-    if (requestStatus === "pending") {
+  try {
+    console.log("Sending request for event:", eventId);
+    const result = await sendJoinRequest(eventId);
+    console.log("Join request success:", result);
+    setRequestStatus("pending");
+    alert("Request sent!");
+  } catch (err: any) {
+    console.error("Join request failed:", err);
+    alert(`Failed to send request: ${err?.message || "Unknown error"}`);
+  }
+};
+  const handleCancelRequest = async () => {
+    if (!eventId) {
+      Alert.alert("Error", "Event ID not found");
+      return;
+    }
+
+    try {
+      await cancelJoinRequest(eventId);
       setRequestStatus("none");
+      Alert.alert("Success", "Request cancelled!");
+    } catch (err) {
+      console.error("Failed to cancel request:", err);
+      Alert.alert("Error", "Failed to cancel request");
     }
   };
 
