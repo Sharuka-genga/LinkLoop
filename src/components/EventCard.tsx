@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { View, Text, StyleSheet, Image, TouchableOpacity, Alert, type ImageStyle, type ViewStyle, type TextStyle } from "react-native";
 import { MapPin, Clock, Users, ChevronRight, Zap, MessageCircle, CheckCircle, Pencil, Trash2 } from "lucide-react-native";
+import { useRouter } from "expo-router";
 import { deleteEvent, joinEvent, requestToJoin, checkIfJoined } from "@/lib/events";
 
 type Props = {
@@ -42,11 +43,16 @@ export default function EventCard({
   creatorId, creatorName, creatorAvatar,
   joinMode = "direct", spotsJoined = 0, totalSpots = 0, subcategoryLabel, currentUserId, onDelete,
 }: Props) {
+  const router = useRouter();
   const cat = CATEGORY_CONFIG[category] ?? CATEGORY_CONFIG.other;
   const isHost = !!currentUserId && creatorId === currentUserId;
   const [joinState, setJoinState] = useState<JoinState>("idle");
   const [showDropdown, setShowDropdown] = useState(false);
   const [localSpotsJoined, setLocalSpotsJoined] = useState(spotsJoined);
+
+  useEffect(() => {
+    setLocalSpotsJoined(spotsJoined);
+  }, [spotsJoined]);
 
   useEffect(() => {
     if (currentUserId && !isHost) {
@@ -81,7 +87,10 @@ export default function EventCard({
 
   const handleEdit = () => {
     setShowDropdown(false);
-    Alert.alert("Coming Soon", "Edit event feature coming soon.");
+    router.push({
+      pathname: "/edit-event" as any,
+      params: { eventId: id },
+    });
   };
 
   const handleJoinNow = async () => {

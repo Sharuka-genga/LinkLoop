@@ -62,7 +62,7 @@ type TabType = 'history' | 'invites' | 'requests';
 type FilterType = 'all' | 'event' | 'sport' | 'booking' | 'social' | 'study';
 
 const FILTERS: { key: FilterType; label: string; color: string }[] = [
-  { key: 'all', label: 'All', color: TX.primary },
+  { key: 'all', label: 'All', color: '#000' },
   { key: 'event', label: 'Events', color: Accent.campus },
   { key: 'sport', label: 'Sports', color: Accent.sports },
   { key: 'booking', label: 'Bookings', color: Accent.trips },
@@ -398,11 +398,12 @@ export default function ActivitiesScreen() {
                             key={f.key}
                             style={[
                                 styles.filterChip,
-                                filter === f.key && { backgroundColor: f.color, borderColor: f.color },
+                                filter === f.key && styles.filterChipActive,
+                                filter === f.key && f.key !== 'all' && { backgroundColor: f.color, borderColor: f.color },
                             ]}
                             onPress={() => setFilter(f.key)}
                         >
-                            <Text style={[styles.filterText, filter === f.key && { color: '#fff' }]}>
+                            <Text style={[styles.filterText, filter === f.key && styles.filterTextActive]}>
                                 {f.label}
                             </Text>
                         </TouchableOpacity>
@@ -481,6 +482,8 @@ const styles = StyleSheet.create({
   filterContainer: { gap: 8 },
   filterChip: { backgroundColor: BG.card, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: BG.border },
   filterText: { fontSize: 12, fontWeight: '600', color: TX.secondary },
+  filterChipActive: { backgroundColor: '#000', borderColor: '#fff' },
+  filterTextActive: { color: '#fff' },
 
   monthGroup: { marginBottom: 24 },
   monthHeader: { fontSize: 14, fontWeight: '800', color: TX.label, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 },

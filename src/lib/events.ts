@@ -49,6 +49,49 @@ export async function createEvent(data: {
     return event;
 }
 
+export async function getEventById(eventId: string) {
+    const { data, error } = await supabase
+        .from("events")
+        .select("*")
+        .eq("id", eventId)
+        .single();
+
+    if (error) throw error;
+    return data;
+}
+
+export async function updateEvent(eventId: string, data: {
+    title: string;
+    customActivity?: string;
+    locationType: string;
+    location: string;
+    eventDate: Date;
+    eventTime: Date;
+    peopleNeeded: number;
+    joinMode: string;
+}) {
+    const creatorId = await getCurrentUserId();
+    const { data: event, error } = await supabase
+        .from("events")
+        .update({
+            title: data.title,
+            custom_activity: data.customActivity,
+            location_type: data.locationType,
+            location: data.location,
+            event_date: data.eventDate.toISOString().split("T")[0],
+            event_time: data.eventTime.toTimeString().split(" ")[0],
+            people_needed: data.peopleNeeded,
+            join_mode: data.joinMode,
+        })
+        .eq("id", eventId)
+        .eq("creator_id", creatorId)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return event;
+}
+
 // ── Read all active events from Supabase ───────────────────────
 export async function getEvents() {
     const { data, error } = await supabase
@@ -256,7 +299,10 @@ export async function getJoinRequests() {
         .eq("creator_id", userId);
 
     const myEventIds = new Set((myEvents || []).map(e => e.id));
-    return (data || []).filter(r => myEventIds.has(r.events?.id));
+    return (data || []).filter((r: any) => {
+        const eventId = Array.isArray(r.events) ? r.events[0]?.id : r.events?.id;
+        return myEventIds.has(eventId);
+    });
 }
 
 // ── Accept a join request ────────────────────────────────────────
@@ -283,5 +329,3 @@ export async function deleteEvent(eventId: string) {
         .eq("id", eventId);
     if (error) throw error;
 }
-
-
