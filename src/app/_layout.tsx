@@ -1,14 +1,14 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import 'react-native-reanimated';
 import 'react-native-url-polyfill/auto';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import SplashScreen from '@/components/SplashScreen';
 import { BG } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/context/auth-context';
-import SplashScreen from '@/components/SplashScreen';
 
 const LinkLoopDark = {
   ...DarkTheme,
@@ -77,12 +77,14 @@ export default function RootLayout() {
   const [showSplash, setShowSplash] = useState(true);
 
   return (
-    <AuthProvider>
-      <ThemeProvider value={LinkLoopDark}>
-        <RootNavigator />
-        <StatusBar style="light" />
-        {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
-      </ThemeProvider>
-    </AuthProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AuthProvider>
+        <ThemeProvider value={LinkLoopDark}>
+          <RootNavigator />
+          <StatusBar style="light" />
+          {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
+        </ThemeProvider>
+      </AuthProvider>
+    </GestureHandlerRootView>
   );
 }

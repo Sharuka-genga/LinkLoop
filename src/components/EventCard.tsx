@@ -1,15 +1,10 @@
-import { useState, useEffect } from "react";
-import { View, Text, StyleSheet, Image, TouchableOpacity, Alert, type ImageStyle, type ViewStyle, type TextStyle } from "react-native";
-import { MapPin, Clock, Users, ChevronRight, Zap, MessageCircle, CheckCircle, Pencil, Trash2 } from "lucide-react-native";
-<<<<<<< HEAD:linkloop/src/components/EventCard.tsx
-import { deleteEvent } from "@/lib/events";
+import { checkIfJoined, deleteEvent, joinEvent, requestToJoin } from "@/lib/events";
 import { useRouter } from "expo-router";
+import { CheckCircle, ChevronRight, Clock, MapPin, MessageCircle, Pencil, Trash2, Users, Zap } from "lucide-react-native";
+import { useEffect, useState } from "react";
+import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 const TEST_USER_ID = "8d30902c-c3ca-470a-8f4b-b1b545e8f452"; // Kavindu = YOU
-=======
-import { useRouter } from "expo-router";
-import { deleteEvent, joinEvent, requestToJoin, checkIfJoined } from "@/lib/events";
->>>>>>> origin/main:src/components/EventCard.tsx
 
 type Props = {
   id: string;
@@ -52,12 +47,7 @@ export default function EventCard({
 }: Props) {
   const router = useRouter();
   const cat = CATEGORY_CONFIG[category] ?? CATEGORY_CONFIG.other;
-<<<<<<< HEAD:linkloop/src/components/EventCard.tsx
-  const isHost = creatorId === TEST_USER_ID;
-  const router = useRouter();
-=======
   const isHost = !!currentUserId && creatorId === currentUserId;
->>>>>>> origin/main:src/components/EventCard.tsx
   const [joinState, setJoinState] = useState<JoinState>("idle");
   const [showDropdown, setShowDropdown] = useState(false);
   const [localSpotsJoined, setLocalSpotsJoined] = useState(spotsJoined);

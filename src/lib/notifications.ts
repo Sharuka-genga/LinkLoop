@@ -174,8 +174,9 @@ export async function deleteNotification(id: string) {
 }
 
 export function subscribeToNotifications(onNotification: (notification: Notification) => void) {
+    const channelId = Math.random().toString(36).substring(7);
     return supabase
-        .channel(`notifications:${TEST_USER_ID}`)
+        .channel(`notifications:${TEST_USER_ID}:${channelId}`)
         .on(
             "postgres_changes",
             {
