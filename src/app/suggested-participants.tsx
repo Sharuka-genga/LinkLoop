@@ -5,56 +5,20 @@ import {
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { RefreshCw, Check, Star, Zap, ChevronRight, X, Users } from "lucide-react-native";
+import { getSuggestedUsers, sendInvitation } from "@/lib/events";
 
 const { width: W, height: H } = Dimensions.get("window");
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type User = {
   id: string;
-  name: string;
-  avatar: string;
+  full_name: string;
+  profile_picture_url: string;
   interests: string[];
-  rating: number;
-  eventsJoined: string[];
-  lastActiveDaysAgo: number;
+  engagement_score: number;
   faculty: string;
-  year: string;
+  match_reason: string;
 };
-
-// ─── Mock Users ───────────────────────────────────────────────────────────────
-const ALL_USERS: User[] = [
-  { id: "1", name: "Kasun Silva", avatar: "https://i.pravatar.cc/150?img=68", interests: ["sports", "fitness"], rating: 4.8, eventsJoined: ["sports", "fitness", "gaming"], lastActiveDaysAgo: 0, faculty: "Engineering", year: "3rd" },
-  { id: "2", name: "Amaya Fernando", avatar: "https://i.pravatar.cc/150?img=41", interests: ["study", "campus"], rating: 4.6, eventsJoined: ["study", "campus", "social"], lastActiveDaysAgo: 2, faculty: "IT", year: "2nd" },
-  { id: "3", name: "Ravi Jayawardena", avatar: "https://i.pravatar.cc/150?img=11", interests: ["sports", "gaming"], rating: 4.7, eventsJoined: ["sports", "gaming"], lastActiveDaysAgo: 0, faculty: "Engineering", year: "4th" },
-  { id: "5", name: "Dineth Madusanka", avatar: "https://i.pravatar.cc/150?img=14", interests: ["gaming", "social"], rating: 4.3, eventsJoined: ["gaming", "social"], lastActiveDaysAgo: 5, faculty: "IT", year: "2nd" },
-  { id: "6", name: "Thilini Rajapaksa", avatar: "https://i.pravatar.cc/150?img=44", interests: ["study", "campus", "trips"], rating: 4.9, eventsJoined: ["study", "campus", "trips"], lastActiveDaysAgo: 1, faculty: "Engineering", year: "4th" },
-  { id: "7", name: "Malith Herath", avatar: "https://i.pravatar.cc/150?img=52", interests: ["sports", "trips"], rating: 4.4, eventsJoined: ["sports", "trips"], lastActiveDaysAgo: 6, faculty: "IT", year: "1st" },
-  { id: "8", name: "Nimesha W.", avatar: "https://i.pravatar.cc/150?img=49", interests: ["food", "social", "campus"], rating: 4.7, eventsJoined: ["food", "social", "campus"], lastActiveDaysAgo: 2, faculty: "Business", year: "3rd" },
-  { id: "9", name: "Chamara Bandara", avatar: "https://i.pravatar.cc/150?img=18", interests: ["sports", "fitness"], rating: 4.6, eventsJoined: ["sports", "fitness"], lastActiveDaysAgo: 0, faculty: "Engineering", year: "2nd" },
-  { id: "10", name: "Isuri Senanayake", avatar: "https://i.pravatar.cc/150?img=48", interests: ["campus", "study", "social"], rating: 4.8, eventsJoined: ["campus", "study"], lastActiveDaysAgo: 1, faculty: "Business", year: "4th" },
-  { id: "11", name: "Tharindu Peris", avatar: "https://i.pravatar.cc/150?img=51", interests: ["gaming", "trips"], rating: 4.2, eventsJoined: ["gaming", "trips", "social"], lastActiveDaysAgo: 4, faculty: "IT", year: "3rd" },
-  { id: "12", name: "Dulani Wijeratne", avatar: "https://i.pravatar.cc/150?img=45", interests: ["fitness", "food", "social"], rating: 4.5, eventsJoined: ["fitness", "food"], lastActiveDaysAgo: 2, faculty: "Business", year: "2nd" },
-];
-
-function scoreUser(user: User, categoryId: string): number {
-  let score = 0;
-  if (user.interests.includes(categoryId)) score += 5;
-  if (user.eventsJoined.includes(categoryId)) score += 3;
-  if (user.rating >= 4.5) score += 2;
-  if (user.lastActiveDaysAgo <= 7) score += 1;
-  return score;
-}
-
-function getPage(categoryId: string, page: number): User[] {
-  const scored = [...ALL_USERS]
-    .map((u) => ({ ...u, score: scoreUser(u, categoryId) }))
-    .sort((a, b) => b.score - a.score);
-  const result: User[] = [];
-  for (let i = 0; i < 6; i++) {
-    result.push(scored[(page * 6 + i) % scored.length]);
-  }
-  return result;
-}
 
 // ─── Bubble positions: 6 in a circle ─────────────────────────────────────────
 const BUBBLE_SIZE = 78;
@@ -143,6 +107,9 @@ function Bubble({
   const pulseScale = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] });
   const pulseOpacity = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 0] });
 
+  const hasAvatar = !!user.profile_picture_url;
+  const initial = (user.full_name || "?").charAt(0).toUpperCase();
+
   return (
     <Animated.View
       style={[
@@ -193,7 +160,13 @@ function Bubble({
           onPress={onPress}
           activeOpacity={0.85}
         >
-          <Image source={{ uri: user.avatar }} style={styles.bubbleImg} />
+          {hasAvatar ? (
+            <Image source={{ uri: user.profile_picture_url }} style={styles.bubbleImg} />
+          ) : (
+            <View style={styles.bubbleFallback}>
+              <Text style={[styles.bubbleFallbackLetter, { color }]}>{initial}</Text>
+            </View>
+          )}
 
           {/* Sent overlay */}
           {isSent && (
@@ -201,17 +174,12 @@ function Bubble({
               <Check size={24} color="#000" strokeWidth={3} />
             </Animated.View>
           )}
-
-          {/* Online dot */}
-          {user.lastActiveDaysAgo === 0 && !isSent && (
-            <View style={styles.onlineDot} />
-          )}
         </TouchableOpacity>
       </Animated.View>
 
       {/* Name */}
       <Text style={[styles.bubbleName, isSent && { color, fontWeight: "800" }]} numberOfLines={1}>
-        {user.name.split(" ")[0]}
+        {user.full_name.split(" ")[0]}
       </Text>
     </Animated.View>
   );
@@ -220,16 +188,17 @@ function Bubble({
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function SuggestedParticipants() {
   const router = useRouter();
-  const { categoryId, categoryLabel, categoryColor, eventTitle } = useLocalSearchParams<{
+  const { categoryId, categoryLabel, categoryColor, eventTitle, eventId } = useLocalSearchParams<{
     categoryId: string;
     categoryLabel: string;
     categoryColor: string;
     eventTitle: string;
+    eventId: string;
   }>();
 
-  const color = "#818CF8";
-  const [page, setPage] = useState(0);
-  const [users, setUsers] = useState<User[]>(() => getPage(categoryId || "sports", 0));
+  const color = categoryColor || "#818CF8";
+  const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState<User[]>([]);
   const [inviteStatus, setInviteStatus] = useState<Record<string, "idle" | "sent">>({});
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -240,6 +209,23 @@ export default function SuggestedParticipants() {
   const infoPanelOpacity = useRef(new Animated.Value(0)).current;
   // Refresh spin
   const refreshSpin = useRef(new Animated.Value(0)).current;
+
+  const loadSuggested = async () => {
+    if (!eventId) return;
+    setLoading(true);
+    try {
+      const data = await getSuggestedUsers(eventId, 6);
+      setUsers((data || []).slice(0, 6));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSuggested();
+  }, [eventId]);
 
   const sentCount = Object.values(inviteStatus).filter((s) => s === "sent").length;
 
@@ -270,22 +256,34 @@ export default function SuggestedParticipants() {
 
   const handleRefresh = () => {
     setSelected(null);
-    const next = page + 1;
-    setPage(next);
-    setUsers(getPage(categoryId || "sports", next));
+    loadSuggested();
     Animated.sequence([
       Animated.timing(refreshSpin, { toValue: 1, duration: 400, easing: Easing.out(Easing.ease), useNativeDriver: true }),
       Animated.timing(refreshSpin, { toValue: 0, duration: 0, useNativeDriver: true }),
     ]).start();
   };
 
-  const handleInvite = (userId: string, userName: string) => {
-    setInviteStatus((p) => ({ ...p, [userId]: "sent" }));
-    setSelected(null);
+  const handleInvite = async (userId: string, userName: string) => {
+    if (!eventId) {
+      Alert.alert("Error", "Missing Event ID. Please go back and try again.");
+      return;
+    }
+    try {
+      await sendInvitation(eventId, userId);
+      setInviteStatus((p) => ({ ...p, [userId]: "sent" }));
+      setSelected(null);
+    } catch (err: any) {
+      if (err?.code === "23505") {
+        setInviteStatus((p) => ({ ...p, [userId]: "sent" }));
+        setSelected(null);
+      } else {
+        Alert.alert("Error", "Could not send invitation. Try again.");
+      }
+    }
   };
 
   const handleDone = () => {
-    router.push("/");
+    router.replace("/(tabs)");
   };
 
   const selectedUser = users.find((u) => u.id === selected);
@@ -304,12 +302,12 @@ export default function SuggestedParticipants() {
         <View>
           <Text style={styles.headerTitle}>Invite Participants</Text>
           <Text style={styles.headerSub}>
-            Tap a bubble to invite  ·  <Text style={{ color, fontWeight: "800" }}>{sentCount}</Text> / 6 sent
+            Tap a bubble to invite  ·  <Text style={{ color, fontWeight: "800" }}>{sentCount}</Text> sent
           </Text>
         </View>
         <View style={[styles.catPill, { backgroundColor: color + "22", borderColor: color + "55" }]}>
           <Zap size={10} color={color} fill={color} strokeWidth={0} />
-          <Text style={[styles.catPillText, { color }]}>{categoryLabel}</Text>
+          <Text style={[styles.catPillText, { color }]}>{categoryLabel || "Category"}</Text>
         </View>
       </View>
 
@@ -339,11 +337,11 @@ export default function SuggestedParticipants() {
         </Animated.View>
 
         {/* Bubbles */}
-        {users.map((user, i) => (
+        {!loading && users.map((user, i) => (
           <Bubble
-            key={`${user.id}-${page}`}
+            key={`${user.id}`}
             user={user}
-            index={i}
+            index={i % 6} // Keep within 6 positions
             color={color}
             isSent={inviteStatus[user.id] === "sent"}
             isSelected={selected === user.id}
@@ -353,6 +351,11 @@ export default function SuggestedParticipants() {
             }}
           />
         ))}
+        {loading && (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Finding participants...</Text>
+          </View>
+        )}
       </View>
 
       {/* Info panel — slides up when bubble tapped */}
@@ -366,28 +369,35 @@ export default function SuggestedParticipants() {
       >
         {selectedUser && (
           <>
-            <Image
-              source={{ uri: selectedUser.avatar }}
-              style={[styles.infoPanelAvatar, { borderColor: color }]}
-            />
+            {selectedUser.profile_picture_url ? (
+              <Image
+                source={{ uri: selectedUser.profile_picture_url }}
+                style={[styles.infoPanelAvatar, { borderColor: color }]}
+              />
+            ) : (
+              <View style={[styles.infoPanelAvatar, styles.infoPanelAvatarFallback, { borderColor: color }]}>
+                <Text style={[styles.infoPanelAvatarLetter, { color }]}>{(selectedUser.full_name || "?").charAt(0).toUpperCase()}</Text>
+              </View>
+            )}
             <View style={styles.infoPanelInfo}>
-              <Text style={styles.infoPanelName}>{selectedUser.name}</Text>
+              <Text style={styles.infoPanelName}>{selectedUser.full_name}</Text>
               <View style={styles.infoPanelMeta}>
                 <Star size={10} color="#FBBF24" fill="#FBBF24" strokeWidth={0} />
-                <Text style={styles.infoPanelRating}>{selectedUser.rating.toFixed(1)}</Text>
+                <Text style={styles.infoPanelRating}>{(selectedUser.engagement_score / 10).toFixed(1)}</Text>
                 <Text style={styles.infoPanelSep}>·</Text>
                 <Text style={styles.infoPanelMetaText}>
-                  {selectedUser.year} Yr · {selectedUser.faculty}
+                  {selectedUser.faculty}
                 </Text>
               </View>
-              <Text style={styles.infoPanelInterests} numberOfLines={1}>
-                {selectedUser.interests.join(", ")}
-              </Text>
+              <View style={styles.matchReasonPill}>
+                <Zap size={9} color="#818CF8" fill="#818CF8" />
+                <Text style={styles.matchReasonText}>{selectedUser.match_reason}</Text>
+              </View>
             </View>
             <View style={styles.infoPanelActions}>
               <TouchableOpacity
                 style={[styles.inviteBtn, { backgroundColor: color }]}
-                onPress={() => handleInvite(selectedUser.id, selectedUser.name)}
+                onPress={() => handleInvite(selectedUser.id, selectedUser.full_name)}
                 activeOpacity={0.85}
               >
                 <Text style={styles.inviteBtnText}>Invite</Text>
@@ -505,6 +515,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#141B2D",
   },
   bubbleImg: { width: "100%", height: "100%" },
+  bubbleFallback: { width: "100%", height: "100%", alignItems: "center", justifyContent: "center", backgroundColor: "#0F172A" },
+  bubbleFallbackLetter: { fontSize: 28, fontWeight: "900" },
   sentOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center", justifyContent: "center",
@@ -526,12 +538,20 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   infoPanelAvatar: { width: 48, height: 48, borderRadius: 24, borderWidth: 2.5 },
+  infoPanelAvatarFallback: { backgroundColor: "#0F172A", alignItems: "center", justifyContent: "center" },
+  infoPanelAvatarLetter: { fontSize: 20, fontWeight: "900" },
   infoPanelInfo: { flex: 1 },
   infoPanelName: { fontSize: 15, fontWeight: "800", color: "#F1F5F9", marginBottom: 3 },
   infoPanelMeta: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 3 },
   infoPanelRating: { fontSize: 11, color: "#FBBF24", fontWeight: "700" },
   infoPanelSep: { fontSize: 11, color: "#334155" },
   infoPanelMetaText: { fontSize: 11, color: "#475569", fontWeight: "500" },
+  matchReasonPill: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    backgroundColor: "rgba(129,140,248,0.1)", paddingHorizontal: 6,
+    paddingVertical: 3, borderRadius: 6, alignSelf: "flex-start", marginTop: 2
+  },
+  matchReasonText: { fontSize: 10, color: "#818CF8", fontWeight: "700", textTransform: "uppercase" },
   infoPanelInterests: { fontSize: 10, color: "#334155", fontWeight: "500" },
   infoPanelActions: { flexDirection: "column", gap: 6, alignItems: "center" },
   inviteBtn: {
@@ -556,4 +576,6 @@ const styles = StyleSheet.create({
   },
   doneBtnText: { fontSize: 15, fontWeight: "800" },
   footerNote: { fontSize: 11, color: "#1E2A40", textAlign: "center", fontWeight: "500" },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loadingText: { color: "#475569", fontSize: 14, fontWeight: "600" },
 });

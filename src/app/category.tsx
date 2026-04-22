@@ -40,7 +40,7 @@ export default function CategorySelect() {
   const handleSelect = (item: any, isLast: boolean) => {
     if (isLast) {
       router.push({
-        pathname: "/event-form",
+        pathname: "/event-form" as any,
         params: {
           categoryId: "custom", categoryLabel: "Custom",
           categoryColor: "#94A3B8", subcategoryId: "custom",
@@ -49,7 +49,7 @@ export default function CategorySelect() {
       });
     } else {
       router.push({
-        pathname: "/subcategory",
+        pathname: "/subcategory" as any,
         params: { categoryId: item.id, categoryLabel: item.label, categoryColor: item.color },
       });
     }

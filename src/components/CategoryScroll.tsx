@@ -54,8 +54,7 @@ export function CategoryScroll() {
 
   const handleTap = (id: string, label: string, color: string) => {
     router.push({
-      pathname: "/subcategory",
-      //@ts-ignore
+      pathname: "/subcategory" as any,
       params: { categoryId: id, categoryLabel: label, categoryColor: color },
     });
   };

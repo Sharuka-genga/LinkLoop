@@ -1,9 +1,8 @@
-import { useState } from "react";
-import { View, Text, StyleSheet, Image, TouchableOpacity, Alert } from "react-native";
+import { useState, useEffect } from "react";
+import { View, Text, StyleSheet, Image, TouchableOpacity, Alert, type ImageStyle, type ViewStyle, type TextStyle } from "react-native";
 import { MapPin, Clock, Users, ChevronRight, Zap, MessageCircle, CheckCircle, Pencil, Trash2 } from "lucide-react-native";
-import { deleteEvent } from "@/lib/events";
-
-const TEST_USER_ID = "8d30902c-c3ca-470a-8f4b-b1b545e8f452"; // Kavindu = YOU
+import { useRouter } from "expo-router";
+import { deleteEvent, joinEvent, requestToJoin, checkIfJoined } from "@/lib/events";
 
 type Props = {
   id: string;
@@ -17,9 +16,10 @@ type Props = {
   creatorName?: string;
   creatorAvatar?: string;
   joinMode?: "direct" | "request";
-  spotsLeft?: number;
+  spotsJoined?: number; // Renamed for clarity
   totalSpots?: number;
   subcategoryLabel?: string;
+  currentUserId?: string;
   onDelete?: () => void;
 };
 
@@ -41,15 +41,26 @@ type JoinState = "idle" | "requested" | "joined";
 export default function EventCard({
   id, title, location, date, time, peopleNeeded, category,
   creatorId, creatorName, creatorAvatar,
-  joinMode = "direct", spotsLeft, totalSpots, subcategoryLabel, onDelete,
+  joinMode = "direct", spotsJoined = 0, totalSpots = 0, subcategoryLabel, currentUserId, onDelete,
 }: Props) {
+  const router = useRouter();
   const cat = CATEGORY_CONFIG[category] ?? CATEGORY_CONFIG.other;
-  const isHost = creatorId === TEST_USER_ID;
+  const isHost = !!currentUserId && creatorId === currentUserId;
   const [joinState, setJoinState] = useState<JoinState>("idle");
   const [showDropdown, setShowDropdown] = useState(false);
+  const [localSpotsJoined, setLocalSpotsJoined] = useState(spotsJoined);
 
-  const fillPct = spotsLeft != null && totalSpots != null && totalSpots > 0
-    ? ((totalSpots - spotsLeft) / totalSpots) * 100 : 0;
+  useEffect(() => {
+    setLocalSpotsJoined(spotsJoined);
+  }, [spotsJoined]);
+
+  useEffect(() => {
+    if (currentUserId && !isHost) {
+      checkIfJoined(id).then(status => setJoinState(status as JoinState));
+    }
+  }, [id, currentUserId, isHost]);
+
+  const fillPct = totalSpots > 0 ? (localSpotsJoined / totalSpots) * 100 : 0;
 
   const handleDelete = async () => {
     setShowDropdown(false);
@@ -76,17 +87,31 @@ export default function EventCard({
 
   const handleEdit = () => {
     setShowDropdown(false);
-    Alert.alert("Coming Soon", "Edit event feature coming soon.");
+    router.push({
+      pathname: "/edit-event" as any,
+      params: { eventId: id },
+    });
   };
 
-  const handleJoinNow = () => {
-    setJoinState("joined");
-    Alert.alert("Joined!", "You have joined this event.");
+  const handleJoinNow = async () => {
+    try {
+      await joinEvent(id);
+      setJoinState("joined");
+      setLocalSpotsJoined(prev => prev + 1);
+      Alert.alert("Joined!", "You have joined this event.");
+    } catch (err) {
+      Alert.alert("Error", "Could not join event. Try again.");
+    }
   };
 
-  const handleRequestJoin = () => {
-    setJoinState("requested");
-    Alert.alert("Request Sent!", "Your request has been sent to the host.");
+  const handleRequestJoin = async () => {
+    try {
+      await requestToJoin(id);
+      setJoinState("requested");
+      Alert.alert("Request Sent!", "Your request has been sent to the host.");
+    } catch (err) {
+      Alert.alert("Error", "Could not send request. Try again.");
+    }
   };
 
   const handleOpenChat = () => {
@@ -165,10 +190,13 @@ export default function EventCard({
       {/* Creator row */}
       {creatorName && (
         <View style={styles.creatorRow}>
-          <Image
-            source={{ uri: creatorAvatar || (creatorId === TEST_USER_ID ? "https://i.pravatar.cc/150?img=12" : `https://i.pravatar.cc/150?u=${creatorId}`) }}
-            style={styles.avatar}
-          />
+          {creatorAvatar ? (
+            <Image source={{ uri: creatorAvatar }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarFallback]}>
+              <Text style={styles.avatarLetter}>{creatorName.charAt(0).toUpperCase()}</Text>
+            </View>
+          )}
           <Text style={styles.creatorName}>{creatorName}</Text>
           <Text style={styles.hostLabel}>{isHost ? "YOU" : "HOST"}</Text>
         </View>
@@ -208,9 +236,7 @@ export default function EventCard({
           <Users size={13} color="#64748B" strokeWidth={2} />
           <Text style={styles.spotsText}>{peopleNeeded} people needed</Text>
         </View>
-        {totalSpots != null && spotsLeft != null && (
-          <Text style={styles.spotsCount}>{totalSpots - spotsLeft}/{totalSpots} joined</Text>
-        )}
+        <Text style={styles.spotsCount}>{localSpotsJoined}/{peopleNeeded} joined</Text>
       </View>
 
       {/* Progress bar */}
@@ -332,7 +358,9 @@ const styles = StyleSheet.create({
   creatorRow: {
     flexDirection: "row", alignItems: "center", gap: 9, marginBottom: 10,
   },
-  avatar: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5 },
+  avatar: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, borderColor: "#1E2A40" },
+  avatarFallback: { backgroundColor: "#1E2A40", alignItems: "center", justifyContent: "center" },
+  avatarLetter: { fontSize: 13, fontWeight: "800", color: "#818CF8" },
   creatorName: { fontSize: 13, fontWeight: "700", color: "#CBD5E1", flex: 1 },
   hostLabel: {
     fontSize: 9, fontWeight: "800", color: "#475569",

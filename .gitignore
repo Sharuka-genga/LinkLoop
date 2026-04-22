@@ -61,6 +61,7 @@ yarn-error.log*
 # Environment & Secrets
 ####################################
 .env
+.mcp.json
 application-dev.yml
 application-prod.yml
 *.keystore
