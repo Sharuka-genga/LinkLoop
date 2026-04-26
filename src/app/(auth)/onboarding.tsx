@@ -1,21 +1,22 @@
 import { BG, BR, FW, TX } from "@/constants/theme";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { ArrowRight, ChevronRight } from "lucide-react-native";
 import React, { useRef, useState } from "react";
 import {
   Animated,
-  Dimensions,
   FlatList,
-  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
   ViewToken,
+  useWindowDimensions,
 } from "react-native";
 
-const { width, height } = Dimensions.get("window");
+
 
 // ── Onboarding Data ──────────────────────────────────────────────────────────
 const SLIDES = [
@@ -25,14 +26,16 @@ const SLIDES = [
     title: "Find Your\nPerfect Companion",
     description:
       "Connect with fellow students who share your passion for sports and academic goals.",
-    accent: "#818CF8", // indigo / purple
+    accent: "#818CF8", // indigo
+    gradient: ["rgba(8, 14, 28, 0)", "rgba(8, 14, 28, 0.8)", "#080E1C"],
   },
   {
     id: "2",
     image: require("@/assets/images/onboarding2.png"),
-    title: "Create events & Join\nEffortlessly",
+    title: "Create Events &\nJoin Effortlessly",
     description: "Organise events, and grow your circle — all in one place.",
-    accent: "#38BDF8", // sky blue
+    accent: "#38BDF8", // sky
+    gradient: ["rgba(8, 14, 28, 0)", "rgba(8, 14, 28, 0.8)", "#080E1C"],
   },
   {
     id: "3",
@@ -41,18 +44,19 @@ const SLIDES = [
     description:
       "Get AI-powered recommendations, timely reminders, and earn badges as you level up.",
     accent: "#FBBF24", // gold
+    gradient: ["rgba(8, 14, 28, 0)", "rgba(8, 14, 28, 0.8)", "#080E1C"],
   },
 ] as const;
 
 type Slide = (typeof SLIDES)[number];
 
-// ── Main Component ────────────────────────────────────────────────────────────
 export default function OnboardingScreen() {
+  const { width, height } = useWindowDimensions();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList<Slide>>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
 
-  // Track visible slide
+
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length > 0 && viewableItems[0].index != null) {
@@ -65,7 +69,6 @@ export default function OnboardingScreen() {
     viewAreaCoveragePercentThreshold: 50,
   }).current;
 
-  // Navigate to next slide
   function handleNext() {
     if (currentIndex < SLIDES.length - 1) {
       flatListRef.current?.scrollToIndex({
@@ -75,31 +78,40 @@ export default function OnboardingScreen() {
     }
   }
 
-  // Mark onboarding as seen and navigate to login
   async function handleGetStarted() {
     try {
       await AsyncStorage.setItem("hasSeenOnboarding", "true");
-    } catch (_) {
-      // silently ignore storage errors
-    }
+    } catch (_) {}
     router.replace("/(auth)/login" as any);
   }
 
   const isLastSlide = currentIndex === SLIDES.length - 1;
   const currentAccent = SLIDES[currentIndex].accent;
 
-  // ── Render each slide ──
-  function renderSlide({ item }: { item: Slide }) {
+  function renderSlide({ item, index }: { item: Slide; index: number }) {
+    const inputRange = [(index - 1) * width, index * width, (index + 1) * width];
+    
+    const imageScale = scrollX.interpolate({
+      inputRange,
+      outputRange: [1.08, 1, 1.08],
+      extrapolate: "clamp",
+    });
+
+
     return (
-      <View style={styles.slide}>
-        {/* Illustration */}
-        <View style={styles.imageContainer}>
-          <Image
-            source={item.image}
-            style={styles.illustration}
-            resizeMode="contain"
-          />
-        </View>
+      <View style={[styles.slide, { width }]}>
+        <Animated.Image
+          source={item.image}
+          style={[
+            styles.backgroundImage,
+            { transform: [{ scale: imageScale }] }
+          ]}
+          resizeMode="cover"
+        />
+        <LinearGradient
+          colors={item.gradient as any}
+          style={styles.gradientOverlay}
+        />
       </View>
     );
   }
@@ -108,7 +120,7 @@ export default function OnboardingScreen() {
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      {/* Skip button (top-right) */}
+      {/* Skip Button */}
       {!isLastSlide && (
         <TouchableOpacity
           style={styles.skipBtn}
@@ -119,190 +131,189 @@ export default function OnboardingScreen() {
         </TouchableOpacity>
       )}
 
-      {/* Slide illustrations */}
-      <Animated.FlatList
-        ref={flatListRef}
-        data={SLIDES}
-        keyExtractor={(item) => item.id}
-        renderItem={renderSlide}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-          { useNativeDriver: false },
-        )}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-        style={styles.flatList}
-      />
+      {/* Background Images */}
+      <View style={StyleSheet.absoluteFill}>
+        <Animated.FlatList
+          ref={flatListRef}
+          data={SLIDES}
+          keyExtractor={(item) => item.id}
+          renderItem={renderSlide}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+            { useNativeDriver: true },
+          )}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          scrollEventThrottle={16}
+        />
+      </View>
 
-      {/* Bottom card */}
-      <View style={styles.bottomCard}>
-        {/* Title */}
-        <Text style={styles.title}>{SLIDES[currentIndex].title}</Text>
+      {/* Content Container */}
+      <View style={styles.contentContainer} pointerEvents="box-none">
+        <View style={styles.spacer} />
+        
+        <View style={styles.textSection}>
+          {/* Animated Indicators */}
+          <View style={styles.indicatorsContainer}>
+            {SLIDES.map((_, i) => {
+              const inputRange = [(i - 1) * width, i * width, (i + 1) * width];
+              
+              const dotWidth = scrollX.interpolate({
+                inputRange,
+                outputRange: [1, 4, 1], // Scale factor
+                extrapolate: "clamp",
+              });
+              
+              const opacity = scrollX.interpolate({
+                inputRange,
+                outputRange: [0.3, 1, 0.3],
+                extrapolate: "clamp",
+              });
 
-        {/* Description */}
-        <Text style={styles.description}>
-          {SLIDES[currentIndex].description}
-        </Text>
+              return (
+                <Animated.View
+                  key={i}
+                  style={[
+                    styles.indicator,
+                    { 
+                      transform: [{ scaleX: dotWidth }],
+                      opacity,
+                      backgroundColor: "#818CF8" // Use consistent theme color
+                    },
+                  ]}
 
-        {/* Dot indicators */}
-        <View style={styles.dotsRow}>
-          {SLIDES.map((_, i) => {
-            const inputRange = [(i - 1) * width, i * width, (i + 1) * width];
+                />
+              );
 
-            const dotWidth = scrollX.interpolate({
-              inputRange,
-              outputRange: [8, 22, 8],
-              extrapolate: "clamp",
-            });
+            })}
+          </View>
 
-            const dotOpacity = scrollX.interpolate({
-              inputRange,
-              outputRange: [0.35, 1, 0.35],
-              extrapolate: "clamp",
-            });
+          {/* Title */}
+          <Animated.Text style={styles.title}>
+            {SLIDES[currentIndex].title}
+          </Animated.Text>
 
-            return (
-              <Animated.View
-                key={i}
-                style={[
-                  styles.dot,
-                  {
-                    width: dotWidth,
-                    opacity: dotOpacity,
-                    backgroundColor: currentAccent,
-                  },
-                ]}
-              />
-            );
-          })}
-        </View>
-
-        {/* CTA Button */}
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: currentAccent }]}
-          onPress={isLastSlide ? handleGetStarted : handleNext}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.buttonText}>
-            {isLastSlide ? "Get Started" : "Next"}
+          {/* Description */}
+          <Text style={styles.description}>
+            {SLIDES[currentIndex].description}
           </Text>
-        </TouchableOpacity>
+
+          {/* CTA Footer */}
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={[styles.mainButton, { backgroundColor: "#818CF8" }]}
+
+              onPress={isLastSlide ? handleGetStarted : handleNext}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.mainButtonText}>
+                {isLastSlide ? "Get Started" : "Next Step"}
+              </Text>
+              <ArrowRight size={20} color="#fff" strokeWidth={2.5} />
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
     </View>
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: BG.main,
   },
-
-  // Skip button
-  skipBtn: {
-    position: "absolute",
-    top: 56,
-    right: 24,
-    zIndex: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: BR.pill,
-    backgroundColor: BG.card,
-    borderWidth: 1,
-    borderColor: BG.border,
-  },
-  skipText: {
-    color: TX.secondary,
-    fontSize: 13,
-    fontWeight: FW.body,
-  },
-
-  // FlatList fills top ~55% of screen
-  flatList: {
+  slide: {
     flex: 1,
   },
-
-  slide: {
-    width,
-    alignItems: "center",
-    justifyContent: "center",
+  backgroundImage: {
+    ...StyleSheet.absoluteFillObject,
   },
 
-  imageContainer: {
-    width: width * 0.85,
-    height: height * 0.45,
-    alignItems: "center",
-    justifyContent: "center",
+  gradientOverlay: {
+    ...StyleSheet.absoluteFillObject,
   },
-
-  illustration: {
-    width: "100%",
-    height: "100%",
+  contentContainer: {
+    flex: 1,
+    zIndex: 10,
   },
-
-  // ── Bottom card ──
-  bottomCard: {
-    backgroundColor: BG.card,
-    borderTopLeftRadius: 36,
-    borderTopRightRadius: 36,
+  spacer: {
+    flex: 1,
+  },
+  textSection: {
     paddingHorizontal: 32,
-    paddingTop: 36,
-    paddingBottom: 44,
-    borderTopWidth: 1,
-    borderColor: BG.border,
-    minHeight: height * 0.38,
+    paddingBottom: 60,
+  },
+  indicatorsContainer: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 24,
+  },
+  indicator: {
+    height: 6,
+    width: 6,
+    borderRadius: 3,
   },
 
   title: {
-    fontSize: 30,
+    fontSize: 40,
     fontWeight: FW.hero,
     color: TX.primary,
-    lineHeight: 38,
-    marginBottom: 14,
-    letterSpacing: 0.3,
+    lineHeight: 48,
+    marginBottom: 16,
+    letterSpacing: -0.5,
   },
-
   description: {
-    fontSize: 15,
-    fontWeight: FW.caption,
+    fontSize: 17,
     color: TX.secondary,
-    lineHeight: 23,
-    marginBottom: 28,
+    lineHeight: 26,
+    fontWeight: FW.caption,
+    marginBottom: 40,
+    opacity: 0.9,
   },
-
-  // Dots
-  dotsRow: {
+  footer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 28,
-    gap: 6,
   },
-
-  dot: {
-    height: 8,
-    borderRadius: 4,
-  },
-
-  // Button
-  button: {
-    paddingVertical: 17,
-    borderRadius: BR.button,
+  mainButton: {
+    flex: 1,
+    height: 64,
+    borderRadius: 20,
+    flexDirection: "row",
     alignItems: "center",
-    shadowColor: "#818CF8",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 8,
+    justifyContent: "center",
+    gap: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  mainButtonText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: FW.header,
+    letterSpacing: 0.5,
+  },
+  skipBtn: {
+    position: "absolute",
+    top: 60,
+    right: 24,
+    zIndex: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
   },
 
-  buttonText: {
+  skipText: {
     color: "#fff",
-    fontSize: 17,
-    fontWeight: FW.header,
-    letterSpacing: 0.6,
+    fontSize: 14,
+    fontWeight: FW.body,
   },
 });

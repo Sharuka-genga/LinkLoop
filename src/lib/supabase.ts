@@ -3,8 +3,11 @@ import { createClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+// const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+// const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+// src/lib/supabase.ts
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || "https://diqggfoxvxojdyavgeru.supabase.co";
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_wqgZLZz_MYpGQ3CN2rOl_w_tKigpkWb";
 
 // Custom storage wrapper to handle SSR/Static rendering
 const storage = {
