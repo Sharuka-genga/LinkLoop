@@ -4,6 +4,9 @@ HEAD
 # dependencies
 node_modules/
 
+# Environment variables
+.env
+
 # Expo
 .expo/
 dist/
