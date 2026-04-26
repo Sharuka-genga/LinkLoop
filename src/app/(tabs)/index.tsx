@@ -46,7 +46,7 @@ const TIERS = [
   { min: 500,  emoji: '💎', name: 'Platinum', color: '#60A5FA' },
   { min: 250,  emoji: '🥇', name: 'Gold',     color: '#FBBF24' },
   { min: 100,  emoji: '🥈', name: 'Silver',   color: '#94A3B8' },
-  { min: 0,    emoji: '🟤', name: 'Bronze',   color: '#B45309' },
+  { min: 0,    emoji: '🥉', name: 'Bronze',   color: '#CD7F32' },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -183,6 +183,13 @@ export default function HomeScreen() {
             <Text style={styles.greetingName}>
               {profile?.full_name ? `Hey, ${profile.full_name.split(' ')[0]}` : 'Hey there'}
             </Text>
+            <View style={styles.compactScore}>
+              <Text style={styles.scoreEmoji}>{tier.emoji}</Text>
+              <Text style={styles.scoreText}>{engagementScore}</Text>
+              <Text style={styles.scorePointsLabel}>pts</Text>
+              <View style={styles.scoreDot} />
+              <Text style={[styles.scoreTier, { color: tier.color }]}>{tier.name}</Text>
+            </View>
           </View>
           <View style={styles.headerRight}>
             <TouchableOpacity
@@ -212,23 +219,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* ── Engagement Score Card ───────────────────────── */}
-        <View style={styles.scoreCard}>
-          <View style={[styles.scoreCircle, { borderColor: tier.color }]}>
-            <Text style={[styles.scoreNumber, { color: tier.color }]}>{engagementScore}</Text>
-            <Text style={styles.scoreLabel}>pts</Text>
-          </View>
-          <View style={styles.scoreInfo}>
-            <Text style={styles.scoreTitle}>Engagement Score</Text>
-            <Text style={styles.scoreDesc}>
-              Join events &amp; activities to earn points and level up
-            </Text>
-            <View style={styles.tierBadge}>
-              <Text style={styles.tierEmoji}>{tier.emoji}</Text>
-              <Text style={[styles.tierText, { color: tier.color }]}>{tier.name}</Text>
-            </View>
-          </View>
-        </View>
+
 
         {/* ── Search & Filter ─────────────────────────────── */}
         <View style={styles.searchRow}>
@@ -413,40 +404,23 @@ const styles = StyleSheet.create({
   },
   avatarInitial: { fontSize: 16, fontWeight: FW.header, color: '#818CF8' },
 
-  scoreCard: {
-    backgroundColor: BG.card,
-    borderRadius: BR.card,
-    padding: 20,
+  compactScore: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: BG.border,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    marginTop: 6,
+    alignSelf: 'flex-start',
   },
-  scoreCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: BG.input,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    marginRight: 16,
-  },
-  scoreNumber: { fontSize: 20, fontWeight: FW.hero },
-  scoreLabel: { fontSize: 10, fontWeight: FW.body, color: TX.label, marginTop: -2 },
-  scoreInfo: { flex: 1 },
-  scoreTitle: { fontSize: 16, fontWeight: FW.cardTitle, color: TX.primary, marginBottom: 3 },
-  scoreDesc: {
-    fontSize: 12,
-    fontWeight: FW.caption,
-    color: TX.secondary,
-    lineHeight: 17,
-    marginBottom: 8,
-  },
-  tierBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  tierEmoji: { fontSize: 14 },
-  tierText: { fontSize: 13, fontWeight: FW.header },
+  scoreEmoji: { fontSize: 14, marginRight: 6 },
+  scoreText: { fontSize: 13, fontWeight: '800', color: TX.primary },
+  scorePointsLabel: { fontSize: 10, fontWeight: '600', color: TX.label, marginLeft: 2, textTransform: 'uppercase' },
+  scoreDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: '#475569', marginHorizontal: 8 },
+  scoreTier: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
 
   searchRow: { flexDirection: 'row', gap: 8, marginBottom: 18, zIndex: 1000 },
   searchBox: {
