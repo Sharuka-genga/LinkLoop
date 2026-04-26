@@ -1,0 +1,33 @@
+appId: com.anonymous.linkloop
+---
+- runFlow: ../../common/setup.yaml
+
+# Skip onboarding if app launches into the first-run flow
+- runFlow:
+    when:
+      visible: "Skip"
+    commands:
+      - tapOn: "Skip"
+
+# 1. Verify we are on the login screen
+- assertVisible: "Welcome Back"
+
+# 2. Enter university email
+- tapOn:
+    id: "login-email-input"
+- inputText: "IT23100001@my.sliit.lk"
+
+# 3. Enter password
+- tapOn:
+    id: "login-password-input"
+- inputText: "Demo@1234"
+
+# 4. Dismiss the keyboard so the submit button is reachable
+- hideKeyboard
+
+# 5. Submit using the exposed text node id
+- tapOn:
+    id: "login-button-text"
+
+# 6. Verify successful login
+- assertVisible: "Happening Near You"

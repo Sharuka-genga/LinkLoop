@@ -1,0 +1,33 @@
+appId: host.exp.Exponent
+---
+# This flow is specifically for testing within Expo Go on a physical Android device.
+
+# 1. Skip onboarding if it appears
+- runFlow:
+    when:
+      visible: "Skip"
+    commands:
+      - tapOn: "Skip"
+
+# 2. Verify we are on the login screen
+- assertVisible: "Welcome Back"
+
+# 3. Enter university email
+- tapOn:
+    id: "login-email-input"
+- inputText: "IT23100001@my.sliit.lk"
+
+# 4. Enter password
+- tapOn:
+    id: "login-password-input"
+- inputText: "Demo@1234"
+
+# 5. Dismiss the keyboard so the submit button is reachable
+- hideKeyboard
+
+# 6. Submit using the exposed text node id
+- tapOn:
+    id: "login-button-text"
+
+# 7. Verify successful login (Check for Home screen unique text)
+- assertVisible: "Happening Near You"

@@ -35,6 +35,8 @@ export default function NavBar() {
                 style={styles.createBtn}
                 onPress={() => router.push(item.route as any)}
                 activeOpacity={0.85}
+                testID="create-button"
+                accessibilityLabel="create-button"
               >
                 <Icon size={22} color="#0F172A" strokeWidth={2.5} />
               </TouchableOpacity>

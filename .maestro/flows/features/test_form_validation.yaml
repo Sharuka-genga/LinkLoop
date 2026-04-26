@@ -1,0 +1,25 @@
+appId: host.exp.Exponent
+---
+# Test 4 — Form Validation (Red Highlight)
+
+# # 1. Start creation flow
+# - tapOn:
+#     id: "create-button"
+
+# # 2. Select Category
+# - tapOn:
+#     point: "50%, 50%"
+
+# # 3. Select Subcategory
+# - tapOn: "Badminton"
+# - tapOn: "Continue"
+
+# 4. Verify Final Step
+- assertVisible: "STEP 3 OF 3"
+
+# 5. Attempt to post without filling the form
+- tapOn: "Post Event"
+
+# 6. Assert Validation Errors are visible
+- assertVisible: "*Title is required*"
+- assertVisible: "*Location is required*"

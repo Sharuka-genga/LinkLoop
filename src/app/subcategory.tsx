@@ -197,6 +197,8 @@ export default function SubcategorySelect() {
                   ]}
                   onPress={() => setSelected(sub.id)}
                   activeOpacity={0.75}
+                  testID={`subcategory-card-${sub.id}`}
+                  accessibilityLabel={`subcategory-card-${sub.id}`}
                 >
                   {/* Check badge */}
                   {isActive && (
@@ -241,6 +243,8 @@ export default function SubcategorySelect() {
           onPress={handleContinue}
           disabled={!selected}
           activeOpacity={0.85}
+          testID="subcategory-continue-button"
+          accessibilityLabel="subcategory-continue-button"
         >
           <Text style={[styles.continueBtnText, { color: selected ? "#0F172A" : "#475569" }]}>
             {selected ? "Continue" : "Select an activity"}

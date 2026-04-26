@@ -1,0 +1,6 @@
+appId: com.anonymous.linkloop
+---
+- launchApp:
+    clearState: true
+- stopApp
+- launchApp

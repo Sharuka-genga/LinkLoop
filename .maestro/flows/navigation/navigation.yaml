@@ -1,0 +1,22 @@
+appId: com.anonymous.linkloop
+---
+- runFlow: ../../common/setup.yaml
+
+# Test Tab Navigation
+- tapOn: "Home"
+- assertVisible: "Feed"
+
+- tapOn: "Search"
+- assertVisible: "Discover"
+
+- tapOn: "Notifications"
+- assertVisible: "Activity"
+
+- tapOn: "Profile"
+- assertVisible: "Settings"
+
+# Test Deep Navigation & Back Button
+- tapOn: "Edit Profile"
+- assertVisible: "Update Information"
+- back
+- assertVisible: "Settings"

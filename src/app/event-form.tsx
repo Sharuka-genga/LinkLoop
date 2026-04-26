@@ -110,7 +110,8 @@ export default function EventForm() {
         eventDate: date, eventTime: time, peopleNeeded, joinMode,
       });
 
-      await playSuccessSound();
+      // Don't block the post-success UI on optional audio playback.
+      void playSuccessSound();
       Alert.alert(
         "Successfully Posted!",
         "Your event is now live and people can start joining or requesting.",
@@ -187,6 +188,8 @@ export default function EventForm() {
           style={[styles.input, title && styles.inputActive]}
           value={title}
           onChangeText={setTitle}
+          testID="event-title-input"
+          accessibilityLabel="event-title-input"
         />
         {errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
 
@@ -201,6 +204,8 @@ export default function EventForm() {
                 setLocationType(type);
                 if (type === "inside") setShowDropdown(true);
               }}
+              testID={`location-${type}`}
+              accessibilityLabel={`location-${type}`}
             >
               <MapPin size={13} color={locationType === type ? "#0F172A" : "#475569"} strokeWidth={2.5} />
               <Text
@@ -405,6 +410,8 @@ export default function EventForm() {
           onPress={handlePost}
           activeOpacity={0.85}
           disabled={loading}
+          testID="post-event-button"
+          accessibilityLabel="post-event-button"
         >
           <Text style={styles.postBtnText}>{loading ? "Posting..." : "Post Event"}</Text>
           {!loading && <ChevronRight size={18} color="#0F172A" strokeWidth={3} />}

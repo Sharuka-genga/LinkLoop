@@ -1,0 +1,29 @@
+appId: host.exp.Exponent
+---
+# Test 3 — Subcategory Selection
+
+# 1. Ensure we are on the Home screen (handle onboarding/login if needed)
+# - runFlow: ../auth/login_expo_go.yaml
+
+# 2. Start creation flow
+- tapOn:
+    id: "create-button"
+
+# 3. Verify Step 1
+- assertVisible: "STEP 1 OF 3"
+- assertVisible: "Choose Category"
+
+# 4. Select a category (tapping the center of the screen as requested)
+- tapOn:
+    point: "50%, 50%"
+
+# 5. Verify Step 2 - Subcategory Selection
+- assertVisible: "STEP 2 OF 3"
+- assertVisible: "Choose Activity"
+- assertVisible: "Badminton"
+
+# 6. Select subcategory
+- tapOn: "Badminton"
+
+# 7. Verify Continue button appears
+- assertVisible: "Continue"

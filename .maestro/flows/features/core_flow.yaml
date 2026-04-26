@@ -1,0 +1,7 @@
+appId: com.anonymous.linkloop
+---
+- runFlow: ../auth/login.yaml
+- tapOn: "Add Post" # Example core feature
+- inputText: "This is a test post from Maestro"
+- tapOn: "Post"
+- assertVisible: "Post created successfully"

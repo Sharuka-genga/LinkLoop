@@ -63,6 +63,8 @@ export default function CategorySelect() {
         style={[styles.cardContainer, { width: W }]}
         onPress={() => handleSelect(item, isCustom)}
         activeOpacity={0.9}
+        testID={`category-card-${item.id}`}
+        accessibilityLabel={`category-card-${item.id}`}
       >
         <View style={isCustom ? [styles.imageWrap, { backgroundColor: "#141B2D", justifyContent: "center", alignItems: "center" }] : styles.imageWrap}>
           {isCustom ? (

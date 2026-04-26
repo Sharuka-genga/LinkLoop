@@ -1,0 +1,98 @@
+appId: host.exp.Exponent
+---
+# Test 4 — Create Event
+
+# Handle onboarding/login if needed.
+- runFlow:
+    when:
+      visible: "Skip"
+    commands:
+      - tapOn: "Skip"
+
+- runFlow:
+    when:
+      visible: "Welcome Back"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "IT23100001@my.sliit.lk"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "Demo@1234"
+      - hideKeyboard
+      - tapOn:
+          id: "login-button-text"
+      - assertVisible: "Happening Near You"
+
+# Recover if the previous run already posted an event and is still on the success path.
+- runFlow:
+    when:
+      visible: "Successfully Posted!"
+    commands:
+      - tapOn: "VIEW PARTICIPANTS"
+      - assertVisible: "Invite Participants"
+      - tapOn: "Skip for now"
+      - assertVisible: "Happening Near You"
+
+- runFlow:
+    when:
+      visible: "Invite Participants"
+    commands:
+      - tapOn: "Skip for now"
+      - assertVisible: "Happening Near You"
+
+# Navigate into the creation flow if we are still on the home screen.
+- runFlow:
+    when:
+      visible:
+        id: "create-button"
+    commands:
+      - tapOn:
+          id: "create-button"
+
+- runFlow:
+    when:
+      visible: "STEP 1 OF 3"
+    commands:
+      - tapOn: "Sports"
+
+- runFlow:
+    when:
+      visible: "STEP 2 OF 3"
+    commands:
+      - tapOn: "Badminton"
+      - tapOn: "Continue"
+
+# Recover if the previous run left the location picker open.
+- runFlow:
+    when:
+      visible: "Select Location"
+    commands:
+      - tapOn: "Cafeteria"
+
+# We should now be on the event form.
+- assertVisible: "STEP 3 OF 3"
+
+# Enter title. The current runtime exposes the placeholder text reliably.
+- tapOn: "e.g. Badminton at uni this evening"
+- inputText: "Badminton Match Friday"
+- hideKeyboard
+
+# Select location only if one has not already been chosen by recovery.
+- runFlow:
+    when:
+      visible: "Inside Uni"
+    commands:
+      - tapOn: "Inside Uni"
+      - assertVisible: "Select Location"
+      - tapOn: "Cafeteria"
+
+# Post event.
+- tapOn: "Post Event"
+- evalScript: "maestro.sleep(30000)"
+
+# Verify success, then open the suggested participants screen.
+- assertVisible: "Successfully Posted!"
+- assertVisible: "VIEW PARTICIPANTS"
+- tapOn: "VIEW PARTICIPANTS"
+- assertVisible: "Invite Participants"

@@ -99,6 +99,8 @@ export default function LoginScreen() {
                 keyboardType="email-address"
                 value={email}
                 onChangeText={setEmail}
+                testID="login-email-input"
+                accessibilityLabel="login-email-input"
               />
             </View>
 
@@ -113,6 +115,8 @@ export default function LoginScreen() {
                 autoCapitalize="none"
                 value={password}
                 onChangeText={setPassword}
+                testID="login-password-input"
+                accessibilityLabel="login-password-input"
               />
             </View>
 
@@ -125,6 +129,8 @@ export default function LoginScreen() {
               onPress={handleLogin}
               activeOpacity={0.9}
               disabled={loading}
+              testID="login-button"
+              accessibilityLabel="login-button"
             >
               <LinearGradient
                 colors={['#818CF8', '#6366F1']}
@@ -135,7 +141,13 @@ export default function LoginScreen() {
                 {loading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.buttonText}>Sign In</Text>
+                  <Text
+                    style={styles.buttonText}
+                    testID="login-button-text"
+                    accessibilityLabel="login-button-text"
+                  >
+                    Sign In
+                  </Text>
                 )}
               </LinearGradient>
             </TouchableOpacity>

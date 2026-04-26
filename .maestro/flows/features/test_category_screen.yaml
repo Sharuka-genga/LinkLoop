@@ -1,0 +1,35 @@
+appId: host.exp.Exponent
+---
+
+# Login only when the app is currently on the auth screen.
+- runFlow:
+    when:
+      visible: "Skip"
+    commands:
+      - tapOn: "Skip"
+
+- runFlow:
+    when:
+      visible: "Welcome Back"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "IT23100001@my.sliit.lk"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "Demo@1234"
+      - hideKeyboard
+      - tapOn:
+          id: "login-button-text"
+      - assertVisible: "Happening Near You"
+
+- tapOn:
+    id: "create-button"
+- assertVisible: "STEP 1 OF 3"
+- assertVisible: "Choose Category"
+- assertVisible: "Sports"
+- takeScreenshot: "category_screen"
+- swipe:
+    direction: LEFT
+- assertVisible: "Study"
+- takeScreenshot: "category_swipe"

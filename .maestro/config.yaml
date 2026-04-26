@@ -1,0 +1,4 @@
+appId: com.anonymous.linkloop
+---
+# Global configuration for Maestro tests
+# You can define constants or global setup here.
