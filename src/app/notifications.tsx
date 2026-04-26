@@ -34,9 +34,7 @@ const NotificationItem = ({
     onRead, 
     showOptions 
 }: { 
-    item: NotifType; 
-    onDelete: (id: string) => void; 
-    onJoin: (id: string, eventId?: string) => void;
+    onJoin: (item: NotifType) => void; 
     onRead: (id: string, route?: string) => void;
     showOptions: (item: NotifType) => void;
 }) => {
@@ -72,7 +70,7 @@ const NotificationItem = ({
         return (
             <TouchableOpacity 
                 style={styles.joinSwipeBtn} 
-                onPress={() => onJoin(item.id, item.data?.eventId)}
+                onPress={() => onJoin(item)}
                 activeOpacity={0.9}
             >
                 <Animated.View style={[styles.swipeIconContainer, { transform: [{ translateX: trans }] }]}>
@@ -118,7 +116,7 @@ const NotificationItem = ({
                         {isActionable ? (
                             <TouchableOpacity 
                                 style={styles.inlineJoinBtn}
-                                onPress={() => onJoin(item.id, item.data?.eventId)}
+                                onPress={() => onJoin(item)}
                             >
                                 <Text style={styles.joinBtnText}>Join</Text>
                             </TouchableOpacity>
@@ -188,18 +186,29 @@ export default function NotificationsScreen() {
         }
     };
 
-    const onJoin = async (id: string, eventId?: string) => {
-        setActionLoading(id);
+    const onJoin = async (notification: NotifType) => {
+        setActionLoading(notification.id);
         try {
-            await handleNotificationAction(id, 'join');
-            setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
-            if (eventId) {
-                router.push(`/chat/${eventId}` as any);
+            await handleNotificationAction(notification, 'accept');
+            setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n));
+            if (notification.data?.eventId) {
+                router.push(`/chat/${notification.data.eventId}` as any);
             }
         } catch (error) {
             console.error("Action failed:", error);
+            Alert.alert("Action Failed", "Could not complete the request. Please try again.");
         } finally {
             setActionLoading(null);
+        }
+    };
+
+    const handleMarkAllAsRead = async () => {
+        try {
+            const { markAllAsRead } = await import("@/lib/notifications");
+            await markAllAsRead();
+            setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+        } catch (error) {
+            console.error("Failed to mark all as read:", error);
         }
     };
 
@@ -209,7 +218,6 @@ export default function NotificationsScreen() {
             "Choose an action for this notification.",
             [
                 { text: "Mark as Read", onPress: () => handleRead(item.id) },
-                { text: "Mute", onPress: () => console.log("Muted") },
                 { text: "Delete", style: "destructive", onPress: () => handleDelete(item.id) },
                 { text: "Cancel", style: "cancel" }
             ]
@@ -257,7 +265,7 @@ export default function NotificationsScreen() {
         <NotificationItem 
             item={item} 
             onDelete={handleDelete} 
-            onJoin={onJoin} 
+            onJoin={() => onJoin(item)} 
             onRead={handleRead}
             showOptions={showOptions}
         />
@@ -281,8 +289,8 @@ export default function NotificationsScreen() {
                         <ChevronLeft size={24} color="#F1F5F9" />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>Notifications</Text>
-                    <TouchableOpacity style={styles.iconBtn}>
-                        <MoreHorizontal size={24} color="#F1F5F9" />
+                    <TouchableOpacity style={styles.iconBtn} onPress={handleMarkAllAsRead}>
+                        <CheckCircle size={24} color="#F1F5F9" />
                     </TouchableOpacity>
                 </View>
 

@@ -4,7 +4,6 @@ import { CheckCircle, ChevronRight, Clock, MapPin, MessageCircle, Pencil, Trash2
 import { useEffect, useState } from "react";
 import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-const TEST_USER_ID = "8d30902c-c3ca-470a-8f4b-b1b545e8f452"; // Kavindu = YOU
 
 type Props = {
   id: string;

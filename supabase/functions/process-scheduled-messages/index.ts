@@ -15,7 +15,7 @@ serve(async (req) => {
       .from('scheduled_messages')
       .select('*')
       .lte('send_at', new Date().toISOString())
-      .eq('sent', false);
+      .eq('status', 'pending');
 
     if (fetchError) throw fetchError;
     if (!pendingMessages || pendingMessages.length === 0) {
@@ -23,7 +23,7 @@ serve(async (req) => {
     }
 
     // 2. Loop through and create actual messages
-    const insertedMessageIds = [];
+    const processedIds = [];
     for (const msg of pendingMessages) {
       const { error: insertError } = await supabase
         .from("messages")
@@ -36,11 +36,11 @@ serve(async (req) => {
         });
 
       if (insertError) {
-        // Log error but continue other loops
+        // Log error and mark as failed
         await supabase
-          .from('scheduled_messages')
-          .update({ error_log: insertError.message })
-          .eq('id', msg.id);
+            .from('scheduled_messages')
+            .update({ status: 'failed' })
+            .eq('id', msg.id);
         console.error("Error sending scheduled message", msg.id, insertError);
         continue;
       }
@@ -48,19 +48,20 @@ serve(async (req) => {
       // Mark the scheduled item as sent
       await supabase
         .from('scheduled_messages')
-        .update({ sent: true })
+        .update({ status: 'sent' })
         .eq('id', msg.id);
         
-      insertedMessageIds.push(msg.id);
+      processedIds.push(msg.id);
     }
 
     return new Response(JSON.stringify({ 
       success: true, 
-      processed_count: insertedMessageIds.length,
-      processed_ids: insertedMessageIds 
+      processed_count: processedIds.length,
+      processed_ids: processedIds 
     }), { headers: { "Content-Type": "application/json" } });
     
   } catch (error: any) {
+    console.error("Error in process-scheduled-messages:", error);
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 });

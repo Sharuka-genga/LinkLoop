@@ -20,13 +20,13 @@ import {
   pinMessage, checkInToEvent, getCheckInCount, getEventSummary,
   parseMessageContent, MessageMetadata, logScreenshot, uploadChatMedia, requestMediaAccess,
   updateUserStatus, updateTypingStatus, subscribeToTypingStatus, TypingStatus,
-  cancelPendingMessage, confirmMessageSent, scheduleMessage, checkIfUserCheckedIn
+  cancelPendingMessage, confirmMessageSent, scheduleMessage, checkIfUserCheckedIn, verifyChatAccess
 } from "@/lib/chat";
 import { Pin, CheckCircle2, AlertTriangle, Info, EyeOff, Lock, ShieldAlert, DownloadCloud, UserMinus, Calendar } from "lucide-react-native";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/auth-context";
 
-const TEST_USER_ID = "00000000-0000-0000-0000-000000000001";
 const DELETE_TIME_LIMIT_MS = 60 * 60 * 1000; // 1 hour
 
 const ICEBREAKERS = [
@@ -39,6 +39,7 @@ const ICEBREAKERS = [
 export default function ChatScreen() {
   const { eventId } = useLocalSearchParams<{ eventId: string }>();
   const router = useRouter();
+  const { user, profile } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [polls, setPolls] = useState<Poll[]>([]);
   const [deletedMessageIds, setDeletedMessageIds] = useState<string[]>([]);
@@ -95,13 +96,21 @@ export default function ChatScreen() {
   useEffect(() => {
     if (!eventId) return;
 
-    const channel = supabase.channel(`event_chat:${eventId}`, {
-      config: {
-        presence: {
-          key: TEST_USER_ID,
-        },
-      },
-    });
+    const checkAccess = async () => {
+        try {
+            const hasAccess = await verifyChatAccess(eventId);
+            if (!hasAccess) {
+                Alert.alert("Access Denied", "You are not a participant of this event.");
+                router.replace("/");
+                return;
+            }
+        } catch (error) {
+            console.error("Access verification failed:", error);
+        }
+    };
+    checkAccess();
+
+    const channel = supabase.channel(`event_chat:${eventId}`);
 
     const msgSub = subscribeToMessages(eventId, (newMessage, eventType) => {
       if (eventType === 'INSERT') {
@@ -127,19 +136,13 @@ export default function ChatScreen() {
           simplifiedState[key] = state[key][0] as any as PresenceState;
         });
 
-        // Inject mock idle user Sarah for demonstration
-        simplifiedState['user_idle'] = {
-          user_id: 'user_idle',
-          full_name: 'Sarah',
-          avatar_url: 'https://i.pravatar.cc/150?u=sarah',
-          status: 'idle',
-          last_active: new Date(Date.now() - 5 * 60 * 1000).toISOString()
-        };
-        
         setPresenceState(simplifiedState);
       })
       .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-        if (key !== TEST_USER_ID) {
+        // Wait, if we don't have TEST_USER_ID, we should use auth context
+        // But since we removed key from presence config, it will use the default user id.
+        const currentUserId = user?.id;
+        if (key !== currentUserId) {
           const name = newPresences[0]?.full_name || "Someone";
           const sysMsg: Message = {
             id: `sys-join-${Date.now()}`,
@@ -153,7 +156,8 @@ export default function ChatScreen() {
         }
       })
       .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-        if (key !== TEST_USER_ID) {
+        const currentUserId = user?.id;
+        if (key !== currentUserId) {
           const name = leftPresences[0]?.full_name || "Someone";
           const sysMsg: Message = {
             id: `sys-leave-${Date.now()}`,
@@ -179,22 +183,22 @@ export default function ChatScreen() {
         });
       })
       .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await trackPresence(channel, TEST_USER_ID, { full_name: "You" }, 'active');
+        if (status === 'SUBSCRIBED' && user?.id) {
+          await trackPresence(channel, user.id, { full_name: "You" }, 'active');
         }
       });
 
     // Idle Timer Logic
     const resetIdleTimer = () => {
       lastActiveRef.current = Date.now();
-      if (currentUserStatus !== 'active') {
+      if (currentUserStatus !== 'active' && user?.id) {
         setCurrentUserStatus('active');
-        trackPresence(channel, TEST_USER_ID, { full_name: "You" }, 'active');
+        trackPresence(channel, user.id, { full_name: "You" }, 'active');
       }
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       idleTimerRef.current = setTimeout(() => {
         setCurrentUserStatus('idle');
-        trackPresence(channel, TEST_USER_ID, { full_name: "You" }, 'idle');
+        if (user?.id) trackPresence(channel, user.id, { full_name: "You" }, 'idle');
       }, 2 * 60 * 1000); // 2 minutes
     };
 
@@ -244,7 +248,9 @@ export default function ChatScreen() {
     // Subscribe to DB-backed Typing Status
     const typingSub = subscribeToTypingStatus(eventId, (users) => {
         // Exclude current user from typers list
-        setDbTypingUsers(users.filter(u => u.user_id !== TEST_USER_ID));
+        if (user?.id) {
+            setDbTypingUsers(users.filter(u => u.user_id !== user.id));
+        }
     });
 
     return () => {
@@ -262,21 +268,18 @@ export default function ChatScreen() {
   const fetchCheckInCount = async () => {
     const count = await getCheckInCount(eventId!);
     setCheckInCount(count);
-    const isCheckedIn = await checkIfUserCheckedIn(eventId!, TEST_USER_ID);
-    if (isCheckedIn) setHasArrived(true);
+    if (user?.id) {
+        const isCheckedIn = await checkIfUserCheckedIn(eventId!, user.id);
+        if (isCheckedIn) setHasArrived(true);
+    }
   };
 
   const handleTyping = () => {
-    // Ephemeral Broadcast (Optional, keep for redundancy or remove)
-    const channel = supabase.channel(`event_chat:${eventId}`);
-    broadcastTyping(channel, TEST_USER_ID, "You", true);
-    
-    // DB-backed Status
+    // DB-backed Status only
     updateTypingStatus(eventId!, true);
 
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
-      broadcastTyping(channel, TEST_USER_ID, "You", false);
       updateTypingStatus(eventId!, false);
     }, 2000);
   };
@@ -293,63 +296,7 @@ export default function ChatScreen() {
         setMessages(msgs);
         setPinnedMessages(msgs.filter(m => m.is_pinned));
       } else {
-        // Fallback to mock messages for UI verification
-        const mockMsgs: Message[] = [
-          {
-            id: 'm1',
-            event_id: eventId!,
-            sender_id: 'user_1',
-            content: 'Hey everyone 👋',
-            created_at: new Date(Date.now() - 1000 * 60 * 60 * 25).toISOString(), // Yesterday
-            status: 'seen',
-            profiles: { full_name: 'John', avatar_url: 'https://i.pravatar.cc/150?u=john' }
-          },
-          {
-            id: 'm2',
-            event_id: eventId!,
-            sender_id: 'user_1',
-            content: 'Are we still meeting at 5?',
-            created_at: new Date(Date.now() - 1000 * 60 * 60 * 24.9).toISOString(),
-            status: 'seen',
-            profiles: { full_name: 'John', avatar_url: 'https://i.pravatar.cc/150?u=john' }
-          },
-          {
-            id: 'm3',
-            event_id: eventId!,
-            sender_id: TEST_USER_ID,
-            content: 'Yes! See you there.',
-            created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // Today
-            status: 'seen'
-          },
-          {
-            id: 'm4',
-            event_id: eventId!,
-            sender_id: 'user_idle',
-            content: 'I\'ll be a bit late 😅',
-            created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(), // Today
-            status: 'delivered',
-            profiles: { full_name: 'Sarah', avatar_url: 'https://i.pravatar.cc/150?u=sarah' }
-          },
-          {
-            id: 'm5',
-            event_id: eventId!,
-            sender_id: 'user_idle',
-            content: 'Wait for me for 10 mins',
-            created_at: new Date(Date.now() - 1000 * 60 * 4).toISOString(),
-            status: 'delivered',
-            profiles: { full_name: 'Sarah', avatar_url: 'https://i.pravatar.cc/150?u=sarah' }
-          },
-          {
-            id: 'm6',
-            event_id: eventId!,
-            sender_id: 'user_offline_2',
-            content: 'I\'ll be there in 15 mins!',
-            created_at: new Date(Date.now() - 1000 * 60 * 2).toISOString(),
-            status: 'delivered',
-            profiles: { full_name: 'Mike', avatar_url: 'https://i.pravatar.cc/150?u=mike' }
-          }
-        ];
-        setMessages(mockMsgs);
+        setMessages([]);
         setPinnedMessages([]);
       }
       
@@ -403,24 +350,7 @@ export default function ChatScreen() {
       if (scheduledDate) {
          await scheduleMessage(eventId!, text, scheduledDate, isAnonymousMode);
          Alert.alert("Scheduled", `Message scheduled for ${scheduledDate.toLocaleTimeString()}`);
-         
-         const delay = Math.max(0, scheduledDate.getTime() - Date.now());
-          setTimeout(async () => {
-             try {
-                // Simulate the backend cron job / edge function processing the scheduled message
-                const msg = await sendMessage(eventId!, text, undefined, undefined, isAnonymousMode, 'sent');
-                if (msg) {
-                   setMessages(prev => {
-                      if (prev.some(m => m.id === msg.id)) return prev;
-                      return [...prev, msg];
-                   });
-                   setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-                }
-             } catch (e) {
-                console.error("Failed to send scheduled message automatically", e);
-             }
-         }, delay);
-
+         // Removed client-side setTimeout processing for scheduled messages. Let the backend handle it.
          setScheduledDate(null);
          return;
       }
@@ -432,10 +362,7 @@ export default function ChatScreen() {
 
         const timer = setTimeout(async () => {
           try {
-             // Skip database confirmation for mock messages (FK violation fallback)
-             if (!msg.id.startsWith('mock-')) {
-                await confirmMessageSent(msg.id);
-             }
+             await confirmMessageSent(msg.id);
              
              setPendingMessages(prev => {
                const next = {...prev};
@@ -480,12 +407,6 @@ export default function ChatScreen() {
 
   const handlePin = async () => {
     if (!selectedMessage) return;
-    if (selectedMessage.id.startsWith('mock-')) {
-      Alert.alert("Note", "This is a mock message and cannot be pinned to the database.");
-      setDeleteModalVisible(false);
-      setSelectedMessage(null);
-      return;
-    }
     try {
       await pinMessage(selectedMessage.id, !selectedMessage.is_pinned);
       setDeleteModalVisible(false);
@@ -498,14 +419,10 @@ export default function ChatScreen() {
 
   const handleArrived = async () => {
     try {
+      if (!user?.id) return;
       setHasArrived(true);
-      const res = await checkInToEvent(eventId!, TEST_USER_ID);
-      
-      if (res?.mocked) {
-         setCheckInCount(prev => prev + 1);
-      } else {
-         fetchCheckInCount();
-      }
+      await checkInToEvent(eventId!, user.id);
+      fetchCheckInCount();
     } catch (error) {
       setHasArrived(false);
       Alert.alert("Error", "Failed to check in.");
@@ -529,12 +446,6 @@ export default function ChatScreen() {
 
   const handleDeleteForEveryone = async () => {
     if (!selectedMessage) return;
-    if (selectedMessage.id.startsWith('mock-')) {
-      Alert.alert("Note", "This is a mock message and cannot be deleted from the database.");
-      setDeleteModalVisible(false);
-      setSelectedMessage(null);
-      return;
-    }
     try {
       await deleteMessageForEveryone(selectedMessage.id);
       setDeleteModalVisible(false);
@@ -595,11 +506,7 @@ export default function ChatScreen() {
           longitude: location.coords.longitude
       };
       
-      const msg = await sendMessage(eventId!, "📍 Live Location", undefined, metadata);
-      if (msg && msg.id && msg.id.startsWith('mock-')) {
-        setMessages(prev => [...prev, msg]);
-        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-      }
+      await sendMessage(eventId!, "📍 Live Location", undefined, metadata);
     } catch (err) {
       Alert.alert("Error", "Could not fetch location.");
     }
@@ -620,12 +527,12 @@ export default function ChatScreen() {
 
     const result = source === 'camera'
       ? await ImagePicker.launchCameraAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.All,
+          mediaTypes: ['images', 'videos'],
           allowsEditing: true,
           quality: 0.7,
         })
       : await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.All,
+          mediaTypes: ['images', 'videos'],
           allowsEditing: true,
           quality: 0.7,
         });
@@ -645,11 +552,7 @@ export default function ChatScreen() {
             expires_at: mediaRecord.expires_at
         };
         
-        const msg = await sendMessage(eventId!, "Media Attachment", mediaRecord.file_url, metadata);
-        if (msg && msg.id && msg.id.startsWith('mock-')) {
-          setMessages(prev => [...prev, msg]);
-          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-        }
+        await sendMessage(eventId!, "Media Attachment", mediaRecord.file_url, metadata);
       } catch (err) {
         Alert.alert("Upload Failed", "Could not upload media.");
       } finally {
@@ -659,10 +562,7 @@ export default function ChatScreen() {
   };
 
   const handleRequestAccess = async (mediaId: string) => {
-    if (mediaId.startsWith('mock-')) {
-      Alert.alert("Note", "Cannot request access to mock media.");
-      return;
-    }
+    if (!mediaId) return;
     try {
         await requestMediaAccess(mediaId);
         Alert.alert("Request Sent", "The media owner will review your access request.");
@@ -682,7 +582,7 @@ export default function ChatScreen() {
     }
     
     const totalVotes = poll.options.reduce((sum, opt) => sum + (opt.votes?.length || 0), 0);
-    const userVoted = poll.options.some(opt => opt.votes?.some(v => v.user_id === TEST_USER_ID));
+    const userVoted = poll.options.some(opt => opt.votes?.some(v => v.user_id === user?.id));
     
     return (
       <View style={styles.pollCard}>
@@ -696,7 +596,7 @@ export default function ChatScreen() {
           {poll.options.map(opt => {
             const votesForOption = opt.votes?.length || 0;
             const percentage = totalVotes > 0 ? Math.round((votesForOption / totalVotes) * 100) : 0;
-            const isMyVote = opt.votes?.some(v => v.user_id === TEST_USER_ID);
+            const isMyVote = opt.votes?.some(v => v.user_id === user?.id);
             
             if (userVoted) {
               // Post-voting State
@@ -749,7 +649,7 @@ export default function ChatScreen() {
     // Hide if locally deleted
     if (deletedMessageIds.includes(item.id)) return null;
 
-    const isMe = item.sender_id === TEST_USER_ID;
+    const isMe = item.sender_id === user?.id;
     const isSystem = item.sender_id === 'system';
     const isDeletedGlobally = item.content === "[[DELETED]]";
     
@@ -1010,7 +910,7 @@ export default function ChatScreen() {
               {isFirstInGroup && (
                 <View style={[styles.avatarContainer, styles.avatarActive]}>
                   <RNImage 
-                    source={{ uri: item.profiles?.avatar_url || `https://i.pravatar.cc/80?u=${TEST_USER_ID}` }} 
+                    source={{ uri: item.is_anonymous ? 'https://ui-avatars.com/api/?name=Anonymous&background=random' : (item.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.profiles?.full_name || 'User')}`) }} 
                     style={styles.avatar} 
                   />
                 </View>
@@ -1040,7 +940,7 @@ export default function ChatScreen() {
   );
 
   const canDeleteForEveryone = selectedMessage && 
-                               selectedMessage.sender_id === TEST_USER_ID &&
+                               selectedMessage.sender_id === user?.id &&
                                (Date.now() - new Date(selectedMessage.created_at).getTime()) < DELETE_TIME_LIMIT_MS;
 
   return (
@@ -1055,7 +955,7 @@ export default function ChatScreen() {
             {/* Status Indicator Dot */}
             <View style={[
                 styles.statusDot, 
-                Object.values(presenceState).some(p => p.user_id !== TEST_USER_ID && p.status === 'active') ? styles.onlineDot : styles.offlineDot 
+                Object.values(presenceState).some(p => p.user_id !== user?.id && p.status === 'active') ? styles.onlineDot : styles.offlineDot 
             ]} />
           </View>
           <View style={styles.headerSubRow}>

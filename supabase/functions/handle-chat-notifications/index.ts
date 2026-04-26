@@ -17,7 +17,6 @@ serve(async (req) => {
     }
 
     // 2. Ignore Updates that were already notified (e.g. delivered/seen statuses)
-    // Only process inserts or updates where status changes *to* 'sent' from 'pending'
     if (payload.type === 'UPDATE' && payload.old_record.status !== 'pending') {
       return new Response(JSON.stringify({ message: "Already notified" }), { status: 200 });
     }
@@ -25,11 +24,11 @@ serve(async (req) => {
     // 3. Fetch Event info
     const { data: event } = await supabase
       .from('events')
-      .select('name')
+      .select('title, creator_id')
       .eq('id', record.event_id)
       .single();
 
-    // 4. Format Sender Identity for Anonymous Mode
+    // 4. Format Sender Identity
     let senderName = "Someone";
     if (record.is_anonymous) {
       senderName = "Anonymous";
@@ -42,26 +41,34 @@ serve(async (req) => {
       if (profile) senderName = profile.full_name;
     }
 
-    // 5. Notify all other event participants (excluding sender)
-    // (Assuming there is an `event_checkins` or `event_participants` table that stores user fcm tokens)
-    
-    // For demonstration purposes, we form the FCM Payload:
-    const fcmPayload = {
-      notification: {
-        title: `${senderName} in ${event?.name || 'Group'}`,
-        body: record.is_anonymous ? "New message from Anonymous" : record.content,
-      },
-      data: {
-        eventId: record.event_id,
-        messageId: record.id
-      }
-    };
+    // 5. Fetch all participants to notify
+    const { data: participants } = await supabase
+      .from('event_participants')
+      .select('user_id')
+      .eq('event_id', record.event_id);
 
-    console.log("Dispatching FCM Push:", fcmPayload);
-    // TODO: Call your FCM HTTP v1 API logic here
+    const recipientIds = new Set((participants || []).map(p => p.user_id));
+    recipientIds.add(event.creator_id);
+    recipientIds.delete(record.sender_id); // Exclude sender
 
-    return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json" } });
+    // 6. Create notifications in DB for all recipients
+    if (recipientIds.size > 0) {
+      const notificationRows = Array.from(recipientIds).map(userId => ({
+        user_id: userId,
+        actor_id: record.sender_id,
+        event_id: record.event_id,
+        type: 'message',
+        title: `New message in ${event?.title || 'Group'}`,
+        body: record.is_anonymous ? "Someone sent a message" : `${senderName}: ${record.content.substring(0, 100)}`,
+        data: { eventId: record.event_id, messageId: record.id }
+      }));
+
+      await supabase.from('notifications').insert(notificationRows);
+    }
+
+    return new Response(JSON.stringify({ success: true, notified_count: recipientIds.size }), { headers: { "Content-Type": "application/json" } });
   } catch (error: any) {
+    console.error("Error in handle-chat-notifications:", error);
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 });

@@ -67,7 +67,34 @@ export type PollOption = {
   votes: { user_id: string }[];
 };
 
-const TEST_USER_ID = "00000000-0000-0000-0000-000000000001";
+async function getCurrentUserId() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  return user.id;
+}
+
+export async function verifyChatAccess(eventId: string): Promise<boolean> {
+  const userId = await getCurrentUserId();
+
+  // Check if user is the creator
+  const { data: event } = await supabase
+    .from('events')
+    .select('creator_id')
+    .eq('id', eventId)
+    .single();
+
+  if (event && event.creator_id === userId) return true;
+
+  // Check if user is a participant
+  const { data: participant } = await supabase
+    .from('event_participants')
+    .select('id')
+    .eq('event_id', eventId)
+    .eq('user_id', userId)
+    .single();
+
+  return !!participant;
+}
 
 // ── Messages ─────────────────────────────────────────────────────
 
@@ -77,11 +104,13 @@ export async function sendMessage(eventId: string, content: string, mediaUrl?: s
     finalContent = `[META]:${JSON.stringify({ ...metadata, text: content })}`;
   }
 
+  const userId = await getCurrentUserId();
+
   const { data, error } = await supabase
     .from("messages")
     .insert({
       event_id: eventId,
-      sender_id: TEST_USER_ID,
+      sender_id: userId,
       content: finalContent,
       media_url: mediaUrl,
       is_anonymous: isAnonymous,
@@ -92,24 +121,12 @@ export async function sendMessage(eventId: string, content: string, mediaUrl?: s
 
   if (error) {
     console.warn("sendMessage error:", error);
-    // Fallback to local mock message on any error (like 22P02 UUID or 23503 FK violation)
-    return {
-      id: `mock-msg-${Date.now()}`,
-      event_id: eventId,
-      sender_id: TEST_USER_ID,
-      content: finalContent,
-      media_url: mediaUrl,
-      is_anonymous: isAnonymous,
-      created_at: new Date().toISOString(),
-      status: status
-    };
+    throw error;
   }
   return data;
 }
 
 export async function confirmMessageSent(messageId: string) {
-  if (messageId.startsWith('mock-')) return null;
-
   const { data, error } = await supabase
     .from("messages")
     .update({ status: 'sent' })
@@ -121,7 +138,6 @@ export async function confirmMessageSent(messageId: string) {
 }
 
 export async function cancelPendingMessage(messageId: string) {
-  if (messageId.startsWith('mock-')) return;
   const { error } = await supabase
     .from("messages")
     .update({ status: 'cancelled' })
@@ -131,11 +147,13 @@ export async function cancelPendingMessage(messageId: string) {
 }
 
 export async function scheduleMessage(eventId: string, content: string, sendAt: Date, isAnonymous: boolean = false) {
+  const userId = await getCurrentUserId();
+
   const { data, error } = await supabase
     .from("scheduled_messages")
     .insert({
       event_id: eventId,
-      sender_id: TEST_USER_ID,
+      sender_id: userId,
       content: content,
       send_at: sendAt.toISOString(),
       is_anonymous: isAnonymous
@@ -145,17 +163,7 @@ export async function scheduleMessage(eventId: string, content: string, sendAt: 
 
   if (error) {
     console.warn("scheduleMessage error:", error);
-    // Fallback to mock on any error to prevent UI crash during testing
-    return {
-        id: `mock-scheduled-${Date.now()}`,
-        event_id: eventId,
-        sender_id: TEST_USER_ID,
-        content: content,
-        send_at: sendAt.toISOString(),
-        is_anonymous: isAnonymous,
-        sent: false,
-        created_at: new Date().toISOString()
-    };
+    throw error;
   }
   return data;
 }
@@ -164,36 +172,23 @@ export async function uploadChatMediaDirectly(eventId: string, fileUri: string, 
   const ext = mimeType.split('/').pop()?.split('+')[0] || fileUri.split('.').pop() || 'jpg';
   const fileName = `${eventId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
 
-  // Step 1: Get a signed upload URL from Supabase
-  const { data: signedData, error: signedError } = await supabase.storage
-    .from('chat-media')
-    .createSignedUploadUrl(fileName);
+  const formData = new FormData();
+  formData.append('file', {
+    uri: fileUri,
+    name: `upload.${ext}`,
+    type: mimeType,
+  } as any);
 
-  if (signedError) {
-    console.error("Failed to get signed upload URL:", signedError);
-    throw signedError;
+  const { data, error } = await supabase.storage
+    .from('chat-media')
+    .upload(fileName, formData);
+
+  if (error) {
+    console.error("Failed to upload media:", error);
+    throw error;
   }
 
-  // Step 2: Upload using XMLHttpRequest — the only reliable way to upload
-  // local file:// URIs in React Native (fetch() fails on local URIs)
-  await new Promise<void>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('PUT', signedData.signedUrl);
-    xhr.setRequestHeader('Content-Type', mimeType);
-    xhr.setRequestHeader('x-upsert', 'false');
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve();
-      } else {
-        reject(new Error(`Upload failed with HTTP ${xhr.status}: ${xhr.responseText}`));
-      }
-    };
-    xhr.onerror = () => reject(new Error('Network error during XHR upload'));
-    // React Native XHR can natively resolve local file:// URIs
-    xhr.send({ uri: fileUri, type: mimeType, name: 'upload' } as any);
-  });
-
-  // Step 3: Return the public URL
+  // Return the public URL
   const { data: publicUrlData } = supabase.storage
     .from('chat-media')
     .getPublicUrl(fileName);
@@ -203,7 +198,6 @@ export async function uploadChatMediaDirectly(eventId: string, fileUri: string, 
 
 
 export async function deleteMessageForEveryone(messageId: string) {
-  if (messageId.startsWith('mock-')) return;
   const { error } = await supabase
     .from("messages")
     .update({ content: "[[DELETED]]", media_url: null })
@@ -215,7 +209,7 @@ export async function deleteMessageForEveryone(messageId: string) {
 export async function getMessages(eventId: string) {
   const { data, error } = await supabase
     .from("messages")
-    .select(`*`)
+    .select(`*, profiles (full_name, avatar_url, is_online, last_seen)`)
     .eq("event_id", eventId)
     .order("created_at", { ascending: true });
 
@@ -247,7 +241,7 @@ export function subscribeToMessages(eventId: string, onMessage: (message: Messag
 
         const { data } = await supabase
           .from("messages")
-          .select("*")
+          .select(`*, profiles (full_name, avatar_url, is_online, last_seen)`)
           .eq("id", recordId)
           .single();
         
@@ -261,6 +255,7 @@ export function subscribeToMessages(eventId: string, onMessage: (message: Messag
 
 export async function uploadChatMedia(eventId: string, fileUri: string, mimeType: string, permissionType: 'view_only' | 'request' | 'allow') {
   const publicUrl = await uploadChatMediaDirectly(eventId, fileUri, mimeType);
+  const userId = await getCurrentUserId();
   
   const expiresAt = permissionType === 'view_only' 
     ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() 
@@ -270,7 +265,7 @@ export async function uploadChatMedia(eventId: string, fileUri: string, mimeType
     .from("media")
     .insert({
       event_id: eventId,
-      sender_id: TEST_USER_ID,
+      sender_id: userId,
       file_url: publicUrl,
       permission_type: permissionType,
       expires_at: expiresAt
@@ -279,49 +274,48 @@ export async function uploadChatMedia(eventId: string, fileUri: string, mimeType
     .single();
 
   if (error) {
-    if (error.code === '42P01') { // Table not found (mock environment)
-        return {
-            id: `mock-media-${Date.now()}`,
-            event_id: eventId,
-            sender_id: TEST_USER_ID,
-            file_url: publicUrl,
-            permission_type: permissionType,
-            expires_at: expiresAt,
-            created_at: new Date().toISOString()
-        };
-    }
     throw error;
   }
   return data;
 }
 
 export async function logScreenshot(eventId: string, mediaId?: string) {
+    const userId = await getCurrentUserId();
     const { data, error } = await supabase
         .from("screenshot_logs")
         .insert({
             event_id: eventId,
-            user_id: TEST_USER_ID,
+            user_id: userId,
             media_id: mediaId
         })
         .select()
         .single();
     
-    // Notification logic would ideally be in a DB trigger or Edge Function,
-    // but we can trigger it here for demonstration.
-    if (!error || error.code === '42P01') {
-        const { error: notifError } = await supabase
-            .from("notifications")
-            .insert({
-                user_id: TEST_USER_ID, // In reality, notify the media owner/participants
-                type: 'screenshot_detected',
-                title: 'Screenshot Detected',
-                body: `A screenshot was taken in event ${eventId}`,
-                data: { eventId, mediaId }
-            });
+    if (!error) {
+        // Fetch event creator to notify them
+        const { data: event } = await supabase
+            .from("events")
+            .select("creator_id, title")
+            .eq("id", eventId)
+            .single();
+
+        if (event && event.creator_id !== userId) {
+            await supabase
+                .from("notifications")
+                .insert({
+                    user_id: event.creator_id,
+                    actor_id: userId,
+                    event_id: eventId,
+                    type: 'screenshot_detected',
+                    title: 'Security Alert',
+                    body: `Someone took a screenshot in your event: ${event.title}`,
+                    data: { eventId, mediaId }
+                });
+        }
     }
 
-    if (error && error.code !== '42P01') throw error;
-    return data || { id: 'mock-log' };
+    if (error) throw error;
+    return data;
 }
 
 export async function respondToMediaAccessRequest(requestId: string, status: 'approved' | 'rejected') {
@@ -337,12 +331,12 @@ export async function respondToMediaAccessRequest(requestId: string, status: 'ap
 }
 
 export async function requestMediaAccess(mediaId: string) {
-    if (mediaId.startsWith('mock-')) return { mocked: true };
+    const userId = await getCurrentUserId();
     const { data, error } = await supabase
         .from("media_access_requests")
         .insert({
             media_id: mediaId,
-            requester_id: TEST_USER_ID,
+            requester_id: userId,
             status: 'pending'
         })
         .select()
@@ -355,25 +349,14 @@ export async function requestMediaAccess(mediaId: string) {
 // ── Polls ────────────────────────────────────────────────────────
 
 export async function createPoll(eventId: string, question: string, options: string[]) {
+    const userId = await getCurrentUserId();
     const { data: poll, error: pollError } = await supabase
         .from("chat_polls")
-        .insert({ event_id: eventId, creator_id: TEST_USER_ID, question })
+        .insert({ event_id: eventId, creator_id: userId, question })
         .select()
         .single();
     
     if (pollError) {
-        if (pollError.code === '23503') {
-            console.warn("Mock Event ID detected (FK Violation). Returning mock poll.");
-            return {
-                id: `mock-poll-${Date.now()}`,
-                question: question,
-                options: options.map(opt => ({
-                    id: `mock-opt-${Date.now()}-${Math.random()}`,
-                    option_text: opt,
-                    votes: []
-                }))
-            };
-        }
         throw pollError;
     }
 
@@ -385,10 +368,10 @@ export async function createPoll(eventId: string, question: string, options: str
 }
 
 export async function voteInPoll(optionId: string) {
-    if (optionId.startsWith('mock-')) return;
+    const userId = await getCurrentUserId();
     const { error } = await supabase
         .from("chat_poll_votes")
-        .insert({ option_id: optionId, user_id: TEST_USER_ID });
+        .insert({ option_id: optionId, user_id: userId });
     
     if (error) throw error;
 }
@@ -442,7 +425,6 @@ export function broadcastReadReceipt(channel: any, userId: string, messageId: st
 // ── Pinned Messages & Check-Ins ─────────────────────────────
 
 export async function pinMessage(messageId: string, isPinned: boolean) {
-  if (messageId.startsWith('mock-')) return;
   const { error } = await supabase
     .from("messages")
     .update({ is_pinned: isPinned })
@@ -460,17 +442,14 @@ export async function checkInToEvent(eventId: string, userId: string) {
     .eq("user_id", userId)
     .single();
   
-  if (existing) return { mocked: false };
+  if (existing) return { success: true };
 
   const { error } = await supabase
     .from("event_checkins")
     .insert({ event_id: eventId, user_id: userId });
     
-  // Handle 403/FK violations (Event doesn't exist in DB yet)
-  // 23503: Foreign key violation (event doesn't exist in 'events' table)
-  if (error && error.code === '23503') return { mocked: true };
   if (error && error.code !== '23505') throw error;
-  return { mocked: false };
+  return { success: true };
 }
 
 export async function checkIfUserCheckedIn(eventId: string, userId: string) {
@@ -507,37 +486,45 @@ export async function getEventSummary(eventId: string) {
   const uniqueParticipants = new Set(messages?.map(m => m.sender_id)).size;
   const totalMessages = messages?.length || 0;
 
+  const { data: event } = await supabase
+    .from("events")
+    .select("status")
+    .eq("id", eventId)
+    .single();
+
   return {
     uniqueParticipants,
     totalMessages,
-    status: 'Completed' // Mock status
+    status: event?.status || 'active'
   };
 }
 // ── Presence & Typing ───────────────────────────────────────────
 
 export async function updateUserStatus(isOnline: boolean) {
+    const userId = await getCurrentUserId();
     const { error } = await supabase
         .from('profiles')
         .update({ 
             is_online: isOnline, 
             last_seen: new Date().toISOString() 
         })
-        .eq('id', TEST_USER_ID);
+        .eq('id', userId);
     
     if (error) console.error("Error updating status:", error);
 }
 
 export async function updateTypingStatus(eventId: string, isTyping: boolean) {
+    const userId = await getCurrentUserId();
     const { error } = await supabase
         .from('typing_status')
         .upsert({
             event_id: eventId,
-            user_id: TEST_USER_ID,
+            user_id: userId,
             is_typing: isTyping,
             updated_at: new Date().toISOString()
         }, { onConflict: 'event_id,user_id' });
 
-    if (error && error.code !== '23503') { // Ignore FK errors for mock events
+    if (error) {
         console.error("Error updating typing status:", error);
     }
 }
