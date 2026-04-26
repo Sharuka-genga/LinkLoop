@@ -1,8 +1,10 @@
 import { BG, BR, FW, TX } from "@/constants/theme";
 import { supabase } from "@/lib/supabase";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { Lock, Mail, User } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -19,13 +21,13 @@ import {
   View,
 } from "react-native";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 
 function showToast(message: string) {
   if (Platform.OS === "android") {
     ToastAndroid.show(message, ToastAndroid.LONG);
   } else {
-    Alert.alert("Select your Interests", message);
+    Alert.alert("Registration", message);
   }
 }
 
@@ -62,7 +64,7 @@ export default function SignupScreen() {
       }
     }
   }
-  //validation to check the email format
+
   const isValidSliitEmail = (e: string) =>
     /^[iI][tT]\d+@my\.sliit\.lk$/.test(e.trim());
 
@@ -78,7 +80,7 @@ export default function SignupScreen() {
     if (!isValidSliitEmail(email)) {
       Alert.alert(
         "Invalid Email",
-        "Use a valid SLIIT student email.\nExample: IT23229952@my.sliit.lk",
+        "Please use your university email (e.g., ITxxxxxx@my.sliit.lk)",
       );
       return;
     }
@@ -107,189 +109,246 @@ export default function SignupScreen() {
     if (error) {
       Alert.alert("Sign Up Failed", error.message);
     } else {
-      showToast("");
+      showToast("Registration successful! Check your email to verify.");
       router.push("./interests" as any);
     }
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
-    >
+    <View style={styles.container}>
       <StatusBar style="light" />
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+      
+      {/* Decorative Background Elements */}
+      <View style={styles.bgCircle1} />
+      <View style={styles.bgCircle2} />
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
       >
-        <View style={styles.hero}>
-          <Text style={styles.logo}>LinkLoop</Text>
-          <Text style={styles.tagline}>Create your campus identity</Text>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Sign Up</Text>
-          <Text style={styles.cardSub}>Join your university community</Text>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Full Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="John Doe"
-              placeholderTextColor={TX.label}
-              autoCapitalize="words"
-              value={fullName}
-              onChangeText={setFullName}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>University Email</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="ITxxxxxx@my.sliit.lk"
-              placeholderTextColor={TX.label}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              value={email}
-              onChangeText={setEmail}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Min 6 characters"
-              placeholderTextColor={TX.label}
-              secureTextEntry
-              autoCapitalize="none"
-              value={password}
-              onChangeText={setPassword}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Confirm Password</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Re-enter password"
-              placeholderTextColor={TX.label}
-              secureTextEntry
-              autoCapitalize="none"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-            />
-          </View>
-
-          <TouchableOpacity
-            style={styles.button}
-            onPress={handleSignup}
-            activeOpacity={0.8}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Create Account</Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.toggleBtn}
-            onPress={() => router.push("./login" as any)}
-          >
-            <Text style={styles.toggleText}>
-              Already have an account?{" "}
-              <Text style={styles.toggleHighlight}>Sign In</Text>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <Text style={styles.logoText}>
+              Link<Text style={{ color: '#818CF8' }}>Loop</Text>
             </Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            <Text style={styles.tagline}>Create your campus identity</Text>
+          </View>
+
+          <View style={styles.formContainer}>
+            <Text style={styles.welcomeText}>Join Community</Text>
+            <Text style={styles.subText}>Connect with students like you</Text>
+
+            {/* Name Input */}
+            <View style={styles.inputWrapper}>
+              <User size={20} color={TX.label} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Full Name"
+                placeholderTextColor={TX.label}
+                autoCapitalize="words"
+                value={fullName}
+                onChangeText={setFullName}
+              />
+            </View>
+
+            {/* Email Input */}
+            <View style={styles.inputWrapper}>
+              <Mail size={20} color={TX.label} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="University Email"
+                placeholderTextColor={TX.label}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                value={email}
+                onChangeText={setEmail}
+              />
+            </View>
+
+            {/* Password Input */}
+            <View style={styles.inputWrapper}>
+              <Lock size={20} color={TX.label} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Password (Min 6 chars)"
+                placeholderTextColor={TX.label}
+                secureTextEntry
+                autoCapitalize="none"
+                value={password}
+                onChangeText={setPassword}
+              />
+            </View>
+
+            {/* Confirm Password Input */}
+            <View style={styles.inputWrapper}>
+              <Lock size={20} color={TX.label} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Confirm Password"
+                placeholderTextColor={TX.label}
+                secureTextEntry
+                autoCapitalize="none"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={styles.signupButton}
+              onPress={handleSignup}
+              activeOpacity={0.9}
+              disabled={loading}
+            >
+              <LinearGradient
+                colors={['#818CF8', '#6366F1']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradient}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>Create Account</Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>Already have an account? </Text>
+              <TouchableOpacity onPress={() => router.push("./login" as any)}>
+                <Text style={styles.footerLink}>Sign In</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BG.main },
+  container: { 
+    flex: 1, 
+    backgroundColor: BG.main 
+  },
+  bgCircle1: {
+    position: 'absolute',
+    top: -100,
+    right: -100,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: 'rgba(129, 140, 248, 0.07)',
+  },
+  bgCircle2: {
+    position: 'absolute',
+    bottom: -50,
+    left: -50,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(129, 140, 248, 0.05)',
+  },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-    paddingVertical: 60,
+    paddingHorizontal: 30,
+    paddingTop: height * 0.08,
+    paddingBottom: 40,
   },
-  hero: { alignItems: "center", marginBottom: 32 },
-  logo: {
+  header: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  logoText: {
     fontSize: 42,
     fontWeight: FW.hero,
-    color: "#818CF8",
-    letterSpacing: 2,
+    color: TX.primary,
+    letterSpacing: -1,
   },
   tagline: {
-    fontSize: 15,
-    fontWeight: FW.caption,
+    fontSize: 16,
     color: TX.secondary,
-    marginTop: 6,
+    opacity: 0.6,
+    marginTop: 8,
+    letterSpacing: 1,
   },
-  card: {
-    backgroundColor: BG.card,
-    borderRadius: BR.card,
-    padding: 28,
-    width: width * 0.9,
-    maxWidth: 420,
-    borderWidth: 1,
-    borderColor: BG.border,
+  formContainer: {
+    width: '100%',
   },
-  cardTitle: {
-    fontSize: 24,
+  welcomeText: {
+    fontSize: 28,
     fontWeight: FW.header,
     color: TX.primary,
-    marginBottom: 4,
+    marginBottom: 8,
   },
-  cardSub: {
-    fontSize: 14,
-    fontWeight: FW.caption,
+  subText: {
+    fontSize: 16,
     color: TX.secondary,
     marginBottom: 24,
+    opacity: 0.7,
   },
-  inputGroup: { marginBottom: 14 },
-  label: {
-    fontSize: 13,
-    fontWeight: FW.body,
-    color: TX.label,
-    marginBottom: 6,
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: 16,
+    paddingHorizontal: 16,
+    height: 60,
+  },
+  inputIcon: {
+    marginRight: 12,
+    opacity: 0.5,
   },
   input: {
-    backgroundColor: BG.input,
-    borderRadius: BR.input,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    flex: 1,
     color: TX.primary,
     fontSize: 16,
-    borderWidth: 1,
-    borderColor: BG.border,
+    fontWeight: FW.body,
   },
-  button: {
-    backgroundColor: "#818CF8",
-    paddingVertical: 16,
-    borderRadius: BR.button,
-    alignItems: "center",
-    marginTop: 8,
+  signupButton: {
+    height: 64,
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginTop: 16,
+    marginBottom: 32,
+    shadowColor: "#818CF8",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+    elevation: 8,
+  },
+  gradient: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   buttonText: {
-    color: "#fff",
-    fontSize: 17,
+    color: '#fff',
+    fontSize: 18,
     fontWeight: FW.header,
     letterSpacing: 0.5,
   },
-  toggleBtn: { marginTop: 20, alignItems: "center" },
-  toggleText: {
-    color: TX.secondary,
-    fontSize: 14,
-    fontWeight: FW.body,
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  toggleHighlight: { color: "#818CF8" },
+  footerText: {
+    color: TX.secondary,
+    fontSize: 15,
+    opacity: 0.7,
+  },
+  footerLink: {
+    color: '#818CF8',
+    fontSize: 15,
+    fontWeight: FW.header,
+  },
 });
+
