@@ -1,5 +1,5 @@
-import { Home, Calendar, Plus, User, Sparkles } from 'lucide-react-native';
 import { usePathname, useRouter } from 'expo-router';
+import { Calendar, Home, Plus, Sparkles, User } from 'lucide-react-native';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 type NavItem = {
@@ -19,7 +19,7 @@ export default function NavBar() {
     { icon: Home,     label: 'Home',       route: '/',           active: pathname === '/' },
     { icon: Calendar, label: 'Activities', route: '/activities', active: pathname === '/activities' },
     { icon: Plus,     label: 'Create',     route: '/category',   active: pathname === '/category', isCreate: true },
-    { icon: Sparkles, label: 'AI',         route: '/ai',         active: pathname === '/ai', isAI: true },
+    { icon: Sparkles, label: 'AI',         route: '/ai-assistant',         active: pathname === 'ai-assistant', isAI: true },
     { icon: User,     label: 'Profile',    route: '/profile',    active: pathname === '/profile' },
   ];
 
