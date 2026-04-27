@@ -4,7 +4,6 @@ import { CheckCircle, ChevronRight, Clock, MapPin, MessageCircle, Pencil, Trash2
 import { useEffect, useState } from "react";
 import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-
 type Props = {
   id: string;
   title: string;

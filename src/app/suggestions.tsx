@@ -10,13 +10,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-/*import {
-  getEventsForSuggestions,
-  getTimeSlotFromEventTime,
-} from "@/lib/events";*/
+import { ArrowLeft, Sparkles, MapPin, Calendar, Users, ChevronRight, TrendingUp } from "lucide-react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { supabase } from "@/lib/supabase";
-
-
 
 type EventItem = {
   id: string;
@@ -27,7 +23,7 @@ type EventItem = {
   event_time: string;
   people_needed: number;
   status: string;
-  join_mode: string;   // ← Add this line (line 27)
+  join_mode: string;
   description?: string;
 };
 
@@ -83,41 +79,39 @@ export default function Suggestions() {
     }
   };
 
+  const navigateToDetails = (item: any) => {
+    router.push(
+      `/event-details?id=${item.id}&title=${encodeURIComponent(
+        item.title
+      )}&category=${encodeURIComponent(
+        item.category_label
+      )}&time=${encodeURIComponent(
+        item.event_time
+      )}&location=${encodeURIComponent(
+        item.location || "Campus"
+      )}&description=${encodeURIComponent(
+        item.description || "No description available"
+      )}&joined=0&total=${item.people_needed}&joinMode=${item.join_mode || "request"}`
+    );
+  };
+
   const today = new Date().toLocaleDateString("en-CA");
-
-  const filteredEvents = events.filter((event) => {
-    return event.event_date >= today;
-  });
-
-
+  const filteredEvents = events.filter((event) => event.event_date >= today);
   const MAX_SCORE = 12;
 
   const scoredEvents = filteredEvents
     .map((event) => {
       let score = 0;
-
       if (selectedInterests.includes(event.category_label)) score += 5;
-
       const eventTimeSlot = getTimeSlotFromEventTime(event.event_time);
       if (selectedTime === eventTimeSlot) score += 3;
-
       if (selectedDate && event.event_date === selectedDate) score += 4;
-      
       const percentage = Math.round((score / MAX_SCORE) * 100);
 
       let reason = "Suggested based on available events";
-
-      if (
-        selectedInterests.includes(event.category_label) &&
-        selectedTime === eventTimeSlot &&
-        selectedDate &&
-        event.event_date === selectedDate
-      ) {
+      if (selectedInterests.includes(event.category_label) && selectedTime === eventTimeSlot && selectedDate && event.event_date === selectedDate) {
         reason = "Best match for your interest, time, and selected date";
-      } else if (
-        selectedInterests.includes(event.category_label) &&
-        selectedTime === eventTimeSlot
-      ) {
+      } else if (selectedInterests.includes(event.category_label) && selectedTime === eventTimeSlot) {
         reason = "Best match for your interest and time";
       } else if (selectedInterests.includes(event.category_label)) {
         reason = "Matches your selected interest";
@@ -141,7 +135,7 @@ export default function Suggestions() {
         <StatusBar barStyle="light-content" backgroundColor="#080E1C" />
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#818CF8" />
-          <Text style={styles.loaderText}>Loading suggestions...</Text>
+          <Text style={styles.loaderText}>CRAFTING SUGGESTIONS...</Text>
         </View>
       </SafeAreaView>
     );
@@ -157,67 +151,119 @@ export default function Suggestions() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.wrapper}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.back}>← Back</Text>
-          </TouchableOpacity>
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+              <ArrowLeft size={20} color="#CBD5E1" strokeWidth={2.5} />
+            </TouchableOpacity>
+            <View style={styles.headerText}>
+              <Text style={styles.smallTitle}>MATCHING ENGINE</Text>
+              <Text style={styles.title}>Your Best Matches</Text>
+            </View>
+          </View>
 
-          <Text style={styles.title}>Suggested for You</Text>
           <Text style={styles.info}>
-            Based on your preferences, here are the most relevant upcoming events.
+            We've analyzed your preferences against upcoming campus activities to find your perfect fit.
           </Text>
 
           {scoredEvents.length === 0 ? (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyTitle}>No matching events found</Text>
               <Text style={styles.emptyText}>
-                Try changing your interest, time slot, or date.
+                Try changing your interest, time slot, or date to see more suggestions.
               </Text>
+              <TouchableOpacity style={styles.tryBtn} onPress={() => router.back()}>
+                <Text style={styles.tryText}>Adjust Preferences</Text>
+              </TouchableOpacity>
             </View>
           ) : (
-            scoredEvents.map((item, index) => (
-              <View key={item.id} style={styles.card}>
-                {index === 0 && <Text style={styles.badge}>🔥 Top Pick</Text>}
+            scoredEvents.map((item, index) => {
+              const isTopPick = index === 0;
+              
+              if (isTopPick) {
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    activeOpacity={0.9}
+                    onPress={() => navigateToDetails(item)}
+                  >
+                    <LinearGradient
+                      colors={["#818CF8", "#6366F1"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.topPickCard}
+                    >
+                      <View style={styles.topPickBadge}>
+                        <Sparkles size={12} color="#818CF8" fill="#818CF8" />
+                        <Text style={styles.topPickBadgeText}>{item.percentage}% MATCH • TOP PICK</Text>
+                      </View>
 
-                <Text style={styles.cardTitle}>{item.title}</Text>
+                      <Text style={styles.topPickTitle}>{item.title}</Text>
+                      <Text style={styles.topPickReason}>{item.reason}</Text>
 
-                <Text style={styles.cardSub}>
-                  {item.category_label} • {item.eventTimeSlot}
-                </Text>
+                      <View style={styles.topPickDivider} />
 
-                <Text style={styles.slot}>📍 {item.location}</Text>
-                <Text style={styles.slot}>📅 {item.event_date}</Text>
-                <Text style={styles.slot}>👥 Needs {item.people_needed} people</Text>
+                      <View style={styles.topPickFooter}>
+                        <View style={styles.topPickInfo}>
+                          <MapPin size={12} color="rgba(255,255,255,0.8)" />
+                          <Text style={styles.topPickInfoText}>{item.location}</Text>
+                        </View>
+                        <View style={styles.topPickInfo}>
+                          <Calendar size={12} color="rgba(255,255,255,0.8)" />
+                          <Text style={styles.topPickInfoText}>{item.event_date}</Text>
+                        </View>
+                      </View>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                );
+              }
 
-                <Text style={styles.match}>Match: {item.percentage}%</Text>
-                <Text style={styles.reason}>{item.reason}</Text>
-
+              return (
                 <TouchableOpacity
-                  style={styles.viewBtn}
-                  onPress={() =>
-                    router.push(
-                      `/event-details?id=${item.id}&title=${encodeURIComponent(
-                        item.title
-                      )}&category=${encodeURIComponent(
-                        item.category_label
-                      )}&time=${encodeURIComponent(
-                        item.event_time
-                      )}&location=${encodeURIComponent(
-                        item.location || "Campus"
-                      )}&description=${encodeURIComponent(
-                        item.description || "No description available"
-                      )}&joined=0&total=${item.people_needed}&joinMode=${item.join_mode || "request"}`
-                    )
-                  }
+                  key={item.id}
+                  style={styles.card}
+                  activeOpacity={0.8}
+                  onPress={() => navigateToDetails(item)}
                 >
-                  <Text style={styles.viewText}>View Details</Text>
+                  <View style={styles.cardHeader}>
+                    <View style={styles.cardMain}>
+                      <Text style={styles.cardTitle}>{item.title}</Text>
+                      <Text style={styles.cardSub}>
+                        {item.category_label} • {item.eventTimeSlot}
+                      </Text>
+                    </View>
+                    <View style={styles.matchCircle}>
+                      <TrendingUp size={12} color="#34D399" />
+                      <Text style={styles.matchPercent}>{item.percentage}%</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.cardBody}>
+                    <View style={styles.metaRow}>
+                      <View style={styles.metaItem}>
+                        <MapPin size={14} color="#64748B" />
+                        <Text style={styles.metaText}>{item.location}</Text>
+                      </View>
+                      <View style={styles.metaItem}>
+                        <Users size={14} color="#64748B" />
+                        <Text style={styles.metaText}>{item.people_needed} spots</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.cardFooter}>
+                    <Text style={styles.reason} numberOfLines={1}>{item.reason}</Text>
+                    <ChevronRight size={16} color="#475569" />
+                  </View>
                 </TouchableOpacity>
-              </View>
-            ))
+              );
+            })
           )}
 
-          <TouchableOpacity style={styles.tryBtn} onPress={() => router.back()}>
-            <Text style={styles.tryText}>Try Again</Text>
-          </TouchableOpacity>
+          {scoredEvents.length > 0 && (
+            <TouchableOpacity style={styles.tryBtnSecondary} onPress={() => router.back()}>
+              <Text style={styles.tryTextSecondary}>Not what you're looking for?</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -231,16 +277,14 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: "#080E1C",
   },
   content: {
-    padding: 16,
-    paddingBottom: 40,
-    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 60,
   },
   wrapper: {
     width: "100%",
-    maxWidth: 420,
   },
   loaderContainer: {
     flex: 1,
@@ -249,112 +293,228 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   loaderText: {
-    color: "#CBD5E1",
-    marginTop: 12,
-    fontSize: 14,
-  },
-  back: {
-    color: "#818CF8",
-    marginBottom: 10,
+    color: "#475569",
+    marginTop: 16,
+    fontSize: 13,
     fontWeight: "700",
-    fontSize: 14,
+    letterSpacing: 1,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    marginBottom: 24,
+  },
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "#141B2D",
+    borderWidth: 1.5,
+    borderColor: "#1E2A40",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerText: {
+    flex: 1,
+  },
+  smallTitle: {
+    color: "#818CF8",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 2,
+    marginBottom: 2,
   },
   title: {
     color: "#F1F5F9",
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: "900",
-    marginBottom: 6,
+    letterSpacing: -0.5,
   },
   info: {
-    color: "#94A3B8",
-    marginBottom: 12,
+    color: "#64748B",
     fontSize: 14,
-    lineHeight: 20,
+    lineHeight: 22,
+    marginBottom: 24,
+    fontWeight: "500",
   },
   emptyCard: {
     backgroundColor: "#141B2D",
-    padding: 16,
-    borderRadius: 24,
-    borderWidth: 1,
+    padding: 32,
+    borderRadius: 32,
+    borderWidth: 1.5,
     borderColor: "#1E2A40",
-    marginTop: 10,
+    alignItems: "center",
+    marginTop: 20,
   },
   emptyTitle: {
     color: "#F1F5F9",
-    fontWeight: "700",
-    fontSize: 16,
-    marginBottom: 6,
+    fontWeight: "800",
+    fontSize: 18,
+    marginBottom: 8,
+    textAlign: "center",
   },
   emptyText: {
-    color: "#94A3B8",
-    fontSize: 13,
+    color: "#64748B",
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  topPickCard: {
+    padding: 24,
+    borderRadius: 32,
+    marginBottom: 24,
+    shadowColor: "#818CF8",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  topPickBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F1F5F9",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    alignSelf: "flex-start",
+    gap: 6,
+    marginBottom: 16,
+  },
+  topPickBadgeText: {
+    color: "#818CF8",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+  },
+  topPickTitle: {
+    color: "#F1F5F9",
+    fontSize: 22,
+    fontWeight: "900",
+    marginBottom: 8,
+    lineHeight: 28,
+  },
+  topPickReason: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 14,
     lineHeight: 20,
+    fontWeight: "500",
+  },
+  topPickDivider: {
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    marginVertical: 18,
+  },
+  topPickFooter: {
+    flexDirection: "row",
+    gap: 16,
+  },
+  topPickInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  topPickInfoText: {
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 12,
+    fontWeight: "700",
   },
   card: {
     backgroundColor: "#141B2D",
-    padding: 16,
-    borderRadius: 24,
-    marginTop: 12,
-    borderWidth: 1,
+    borderRadius: 28,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1.5,
     borderColor: "#1E2A40",
-    width: "100%",
   },
-  badge: {
-    color: "#FBBF24",
-    fontWeight: "700",
-    marginBottom: 6,
-    fontSize: 13,
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  cardMain: {
+    flex: 1,
   },
   cardTitle: {
     color: "#F1F5F9",
-    fontWeight: "700",
     fontSize: 17,
+    fontWeight: "800",
+    marginBottom: 4,
   },
   cardSub: {
-    color: "#CBD5E1",
-    marginTop: 4,
+    color: "#94A3B8",
     fontSize: 13,
+    fontWeight: "600",
   },
-  slot: {
-    color: "#38BDF8",
-    marginTop: 8,
-    fontSize: 13,
+  matchCircle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(52, 211, 153, 0.1)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
-  match: {
+  matchPercent: {
     color: "#34D399",
-    marginTop: 8,
-    fontWeight: "700",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  cardBody: {
+    marginTop: 16,
+  },
+  metaRow: {
+    flexDirection: "row",
+    gap: 16,
+  },
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  metaText: {
+    color: "#64748B",
     fontSize: 13,
+    fontWeight: "600",
+  },
+  cardFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#1E2A40",
   },
   reason: {
-    color: "#CBD5E1",
-    marginTop: 8,
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  viewBtn: {
-    marginTop: 12,
-    backgroundColor: "#818CF8",
-    paddingVertical: 10,
-    borderRadius: 14,
-    alignItems: "center",
-  },
-  viewText: {
-    color: "#0F172A",
-    fontWeight: "700",
-    fontSize: 14,
+    color: "#94A3B8",
+    fontSize: 12,
+    fontWeight: "500",
+    flex: 1,
   },
   tryBtn: {
-    marginTop: 20,
-    backgroundColor: "#34D399",
-    paddingVertical: 12,
-    borderRadius: 20,
-    alignItems: "center",
+    backgroundColor: "#818CF8",
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 18,
     width: "100%",
+    alignItems: "center",
   },
   tryText: {
-    color: "#000",
-    fontWeight: "700",
+    color: "#0F172A",
+    fontWeight: "900",
+    fontSize: 15,
+  },
+  tryBtnSecondary: {
+    marginTop: 12,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  tryTextSecondary: {
+    color: "#475569",
     fontSize: 14,
+    fontWeight: "700",
   },
 });

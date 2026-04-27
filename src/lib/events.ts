@@ -110,12 +110,15 @@ export async function getEvents() {
     if (error) throw error;
     
     // Flatten data for easier consumption
-    return data.map(event => ({
-        ...event,
-        creatorName: event.host?.full_name || "Unknown User",
-        creatorAvatar: event.host?.profile_picture_url,
-        participantsCount: event.participants?.[0]?.count || 0
-    }));
+    return data.map(event => {
+        const hostData = Array.isArray(event.host) ? event.host[0] : event.host;
+        return {
+            ...event,
+            creatorName: hostData?.full_name || "Unknown User",
+            creatorAvatar: hostData?.profile_picture_url,
+            participantsCount: event.participants?.[0]?.count || 0
+        };
+    });
 }
 
 // ── Join an event (Direct mode) ───────────────────────────────
@@ -246,9 +249,15 @@ export async function sendInvitation(eventId: string, receiverId: string) {
         .single();
 
     if (error) {
+        // If it's a duplicate key error, we can just return the existing record (or handle as success)
         if (error.code === '23505') {
-            // Silence duplicate key errors — the invitation already exists
-            return { alreadySent: true };
+            const { data: existing } = await supabase
+                .from("event_invitations")
+                .select("*")
+                .eq("event_id", eventId)
+                .eq("receiver_id", receiverId)
+                .single();
+            return existing;
         }
         console.error("Supabase error sending invitation:", error);
         throw error;
@@ -373,4 +382,52 @@ export async function deleteEvent(eventId: string) {
         .delete()
         .eq("id", eventId);
     if (error) throw error;
+}
+
+export async function getMyEvents() {
+    const userId = await getCurrentUserId();
+    
+    const { data: created, error: err1 } = await supabase
+        .from('events')
+        .select(`
+            *,
+            host:profiles!creator_id (
+                full_name,
+                profile_picture_url
+            ),
+            participants:event_participants(count)
+        `)
+        .eq('creator_id', userId);
+
+    const { data: joined, error: err2 } = await supabase
+        .from('event_participants')
+        .select(`
+            event_id,
+            events (
+                *,
+                host:profiles!creator_id (
+                    full_name,
+                    profile_picture_url
+                ),
+                participants:event_participants(count)
+            )
+        `)
+        .eq('user_id', userId);
+
+    if (err1) throw err1;
+    if (err2) throw err2;
+
+    const joinedEvents = (joined || []).map((j: any) => j.events).filter(Boolean);
+    const all = [...(created || []), ...joinedEvents];
+    const unique = Array.from(new Map(all.map(e => [e.id, e])).values());
+
+    return unique.map(event => {
+        const hostData = Array.isArray(event.host) ? event.host[0] : event.host;
+        return {
+            ...event,
+            creatorName: hostData?.full_name || "Unknown User",
+            creatorAvatar: hostData?.profile_picture_url,
+            participantsCount: event.participants?.[0]?.count || 0
+        };
+    });
 }

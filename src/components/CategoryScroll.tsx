@@ -24,7 +24,7 @@ const TILE_STEP = TILE_SIZE + TILE_GAP;
 const TOTAL_WIDTH = CATEGORIES.length * TILE_STEP;
 const TILES = [...CATEGORIES, ...CATEGORIES];
 
-export function CategoryScroll() {
+export function CategoryScroll({ onSelectCategory }: { onSelectCategory?: (id: string) => void }) {
   const router = useRouter();
   const anim1 = useRef(new Animated.Value(0)).current;
   const anim2 = useRef(new Animated.Value(0)).current;
@@ -53,10 +53,14 @@ export function CategoryScroll() {
   }, []);
 
   const handleTap = (id: string, label: string, color: string) => {
-    router.push({
-      pathname: "/subcategory" as any,
-      params: { categoryId: id, categoryLabel: label, categoryColor: color },
-    });
+    if (onSelectCategory) {
+      onSelectCategory(id);
+    } else {
+      router.push({
+        pathname: "/subcategory" as any,
+        params: { categoryId: id, categoryLabel: label, categoryColor: color },
+      });
+    }
   };
 
   const renderTile = (item: typeof CATEGORIES[0], i: number) => (
