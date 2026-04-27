@@ -1,0 +1,29 @@
+appId: host.exp.Exponent
+---
+# Test 7 — Delete Event (From Home Feed)
+
+# 1. Ensure we are on the Home Feed
+- runFlow:
+    when:
+      visible: "Welcome Back"
+    file: ../auth/login_expo_go.yaml
+
+- assertVisible: "Happening Near You"
+
+# 2. Open the menu (3-dots) on the first available card
+# Use the stable host-menu test id once. Multiple taps can toggle the menu closed again.
+- tapOn:
+    id: "three-dot-button"
+
+# 3. Tap Delete Event in the dropdown
+- assertVisible: "Delete Event"
+- tapOn:
+    id: "delete-event-button"
+
+# 4. Confirm on the native Alert
+- assertVisible: "Delete Event"
+- tapOn: "Delete"
+
+# 5. Verify the event is gone
+- evalScript: "maestro.sleep(2000)"
+- assertVisible: "Happening Near You"

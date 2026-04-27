@@ -1,0 +1,51 @@
+appId: host.exp.Exponent
+---
+# Test 6 — Suggested Participants Flow (Starting from Step 3)
+
+# 1. Start from the Event Form (Step 3)
+# Ensure you have already navigated to this screen on your phone.
+
+# 2. Enter title
+- tapOn:
+    id: "event-title-input"
+- inputText: "Badminton Match Friday"
+- hideKeyboard
+- evalScript: "maestro.sleep(500)"
+
+# 3. Select Location
+- tapOn: "Inside Uni"
+- assertVisible: "Select Location"
+- scrollUntilVisible:
+    element: "Badminton court"
+    direction: DOWN
+- tapOn: "Badminton court"
+
+# 4. Post Event
+- tapOn:
+    id: "post-event-button"
+
+# 5. Success Alert & Navigation
+- evalScript: "maestro.sleep(3000)"
+- assertVisible: "Successfully Posted!"
+- tapOn: "View Participants"
+
+# 6. Suggested Participants screen
+- assertVisible: "Invite Participants"
+
+# 7. Tap on a participant bubble (Center area)
+- tapOn:
+    point: "50%, 40%"
+
+# 8. Send Invitation
+- assertVisible: "Invite"
+- tapOn: "Invite"
+
+# 9. Finish
+- tapOn:
+    id: "done-button"
+    optional: true
+- tapOn: "Done.*" # Regex to match "Done · 1 invited"
+- tapOn:
+    text: "Skip for now"
+    optional: true
+- assertVisible: "Happening Near You"

@@ -1,98 +1,43 @@
 appId: host.exp.Exponent
 ---
-# Test 4 — Create Event
+# Test 5 — Create Event (Full Flow)
 
-# Handle onboarding/login if needed.
-- runFlow:
-    when:
-      visible: "Skip"
-    commands:
-      - tapOn: "Skip"
 
-- runFlow:
-    when:
-      visible: "Welcome Back"
-    commands:
-      - tapOn:
-          id: "login-email-input"
-      - inputText: "IT23100001@my.sliit.lk"
-      - tapOn:
-          id: "login-password-input"
-      - inputText: "Demo@1234"
-      - hideKeyboard
-      - tapOn:
-          id: "login-button-text"
-      - assertVisible: "Happening Near You"
+# 2. Start Creation Flow
+- tapOn:
+    id: "create-button"
 
-# Recover if the previous run already posted an event and is still on the success path.
-- runFlow:
-    when:
-      visible: "Successfully Posted!"
-    commands:
-      - tapOn: "VIEW PARTICIPANTS"
-      - assertVisible: "Invite Participants"
-      - tapOn: "Skip for now"
-      - assertVisible: "Happening Near You"
+# 3. Step 1: Select Category
+- assertVisible: "STEP 1 OF 3"
+- tapOn: "Sports"
 
-- runFlow:
-    when:
-      visible: "Invite Participants"
-    commands:
-      - tapOn: "Skip for now"
-      - assertVisible: "Happening Near You"
+# 4. Step 2: Select Subcategory
+- assertVisible: "STEP 2 OF 3"
+- tapOn: "Badminton"
+- tapOn: "Continue"
 
-# Navigate into the creation flow if we are still on the home screen.
-- runFlow:
-    when:
-      visible:
-        id: "create-button"
-    commands:
-      - tapOn:
-          id: "create-button"
+# 5. Step 3: Fill Form
+- evalScript: "maestro.sleep(1000)" # Wait for transition
 
-- runFlow:
-    when:
-      visible: "STEP 1 OF 3"
-    commands:
-      - tapOn: "Sports"
-
-- runFlow:
-    when:
-      visible: "STEP 2 OF 3"
-    commands:
-      - tapOn: "Badminton"
-      - tapOn: "Continue"
-
-# Recover if the previous run left the location picker open.
-- runFlow:
-    when:
-      visible: "Select Location"
-    commands:
-      - tapOn: "Cafeteria"
-
-# We should now be on the event form.
-- assertVisible: "STEP 3 OF 3"
-
-# Enter title. The current runtime exposes the placeholder text reliably.
-- tapOn: "e.g. Badminton at uni this evening"
+- tapOn:
+    id: "event-title-input"
 - inputText: "Badminton Match Friday"
 - hideKeyboard
 
-# Select location only if one has not already been chosen by recovery.
-- runFlow:
-    when:
-      visible: "Inside Uni"
-    commands:
-      - tapOn: "Inside Uni"
-      - assertVisible: "Select Location"
-      - tapOn: "Cafeteria"
+# 6. Select Location
+- tapOn: "Inside Uni"
+- assertVisible: "Select Location"
+- scrollUntilVisible:
+    element: "Badminton court"
+    direction: DOWN
+- tapOn: "Badminton court"
 
-# Post event.
-- tapOn: "Post Event"
-- evalScript: "maestro.sleep(30000)"
+# 7. Post Event
+- tapOn:
+    id: "post-event-button"
 
-# Verify success, then open the suggested participants screen.
+# 8. Success & Navigation
+- evalScript: "maestro.sleep(3000)"
 - assertVisible: "Successfully Posted!"
-- assertVisible: "VIEW PARTICIPANTS"
-- tapOn: "VIEW PARTICIPANTS"
-- assertVisible: "Invite Participants"
+- tapOn: "View Participants"
+

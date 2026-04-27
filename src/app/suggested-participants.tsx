@@ -429,6 +429,8 @@ export default function SuggestedParticipants() {
           ]}
           onPress={handleDone}
           activeOpacity={0.85}
+          testID="done-button"
+          accessibilityLabel="done-button"
         >
           <Text style={[styles.doneBtnText, { color: sentCount > 0 ? "#000" : "#334155" }]}>
             {sentCount > 0 ? `Done  ·  ${sentCount} invited` : "Skip for now"}

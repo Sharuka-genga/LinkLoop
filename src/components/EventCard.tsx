@@ -154,37 +154,33 @@ export default function EventCard({
                 <TouchableOpacity
                   style={styles.threeDotBtn}
                   onPress={() => setShowDropdown(!showDropdown)}
+                  testID="three-dot-button"
+                  accessibilityLabel="three-dot-button"
                 >
-                  <Text style={styles.threeDotText}>•••</Text>
+                  <Text style={styles.threeDotText} testID="three-dot-text">•••</Text>
                 </TouchableOpacity>
-
-                {/* Dropdown menu - rendered here to be inside the zIndex container */}
-                {showDropdown && (
-                  <View style={styles.dropdown}>
-                    <TouchableOpacity style={styles.dropdownItem} onPress={handleEdit}>
-                      <Pencil size={14} color="#CBD5E1" strokeWidth={2.5} />
-                      <Text style={styles.dropdownItemText}>Edit Event</Text>
-                    </TouchableOpacity>
-                    <View style={styles.dropdownDivider} />
-                    <TouchableOpacity style={styles.dropdownItem} onPress={handleDelete}>
-                      <Trash2 size={14} color="#F87171" strokeWidth={2.5} />
-                      <Text style={[styles.dropdownItemText, { color: "#F87171" }]}>Delete Event</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
               </View>
             </View>
           )}
         </View>
       </View>
 
-      {/* Tap outside to close dropdown - moved here so it can be behind the dropdown z-index if needed */}
-      {showDropdown && (
-        <TouchableOpacity
-          style={[StyleSheet.absoluteFillObject, { zIndex: 999 }]}
-          onPress={() => setShowDropdown(false)}
-          activeOpacity={0}
-        />
+      {isHost && showDropdown && (
+        <View style={styles.cardDropdown}>
+          <TouchableOpacity style={styles.dropdownItem} onPress={handleEdit}>
+            <Pencil size={14} color="#CBD5E1" strokeWidth={2.5} />
+            <Text style={styles.dropdownItemText}>Edit Event</Text>
+          </TouchableOpacity>
+          <View style={styles.dropdownDivider} />
+          <TouchableOpacity
+            style={styles.dropdownItem}
+            onPress={handleDelete}
+            testID="delete-event-button"
+          >
+            <Trash2 size={14} color="#F87171" strokeWidth={2.5} />
+            <Text style={[styles.dropdownItemText, { color: "#F87171" }]}>Delete Event</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       {/* Creator row */}
@@ -339,8 +335,8 @@ const styles = StyleSheet.create({
   threeDotText: { fontSize: 18, color: "rgba(148,163,184,0.6)", letterSpacing: 1.5, fontWeight: "900" },
 
   // Dropdown
-  dropdown: {
-    position: "absolute", top: 38, right: 0,
+  cardDropdown: {
+    position: "absolute", top: 52, right: 20,
     backgroundColor: "#1E2A40", borderRadius: 14,
     borderWidth: 1, borderColor: "#2D3E55",
     width: 160, zIndex: 999,
