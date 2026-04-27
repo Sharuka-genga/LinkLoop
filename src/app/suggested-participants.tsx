@@ -271,6 +271,7 @@ export default function SuggestedParticipants() {
     try {
       await sendInvitation(eventId, userId);
       setInviteStatus((p) => ({ ...p, [userId]: "sent" }));
+      Alert.alert("Success", `Invitation sent to ${userName}!`);
       setSelected(null);
     } catch (err: any) {
       if (err?.code === "23505") {

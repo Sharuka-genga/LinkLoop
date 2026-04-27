@@ -6,7 +6,7 @@ import {
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { ArrowLeft, Clock, ChevronRight, MapPin, ChevronDown, Check } from "lucide-react-native";
-import { Audio } from "expo-av";
+import { useAudioPlayer } from "expo-audio";
 import { createEvent } from "@/lib/events";
 
 const INSIDE_LOCATIONS = [
@@ -40,6 +40,8 @@ export default function EventForm() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const player = useAudioPlayer(require("../../assets/sounds/success.wav"));
+
   const validate = () => {
     let newErrors: Record<string, string> = {};
 
@@ -66,26 +68,7 @@ export default function EventForm() {
 
   const playSuccessSound = async () => {
     try {
-      // Configure audio for iOS to play even if on silent (optional but better for feedback)
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        playThroughEarpieceAndroid: false,
-        interruptionModeIOS: 1, // InterruptionModeIOS.DoNotMix
-        allowsRecordingIOS: false,
-      });
-
-      const { sound } = await Audio.Sound.createAsync(
-        require("../../assets/sounds/success.wav"),
-        { shouldPlay: true, volume: 1.0 }
-      );
-      
-      // Auto-unload sound when finished to free memory
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
-          sound.unloadAsync();
-        }
-      });
+      player.play();
     } catch (e) {
       console.log("Error playing sound", e);
     }
