@@ -84,6 +84,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchMode, setSearchMode] = useState('All');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const engagementScore = profile?.engagement_score ?? 0;
@@ -128,13 +129,33 @@ export default function HomeScreen() {
 
   const filteredEvents = events.filter((e) => {
     const matchesCategory = activeFilter === 'all' || e.category_id === activeFilter;
-    const matchesSearch =
-      e.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      e.location?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const searchLower = (searchQuery || '').toLowerCase().trim();
+    if (!searchLower) return matchesCategory;
+
+    const searchableText = (() => {
+      if (searchMode === 'People') return [e.creatorName, e.host?.full_name];
+      if (searchMode === 'Events') return [e.title];
+      if (searchMode === 'Categories') return [e.category_label, e.subcategory_label, e.custom_activity];
+      return [
+        e.title,
+        e.location,
+        e.subcategory_label,
+        e.custom_activity,
+        e.creatorName,
+        e.category_label,
+        e.host?.full_name
+      ];
+    })().filter(Boolean).join(' ').toLowerCase();
+
+    const matchesSearch = searchableText.includes(searchLower);
+
     return matchesCategory && matchesSearch;
   });
 
   const tier = getTier(engagementScore);
+
+  const SEARCH_MODES = ['All', 'Events', 'People', 'Categories'];
 
   return (
     <View style={styles.container}>
@@ -191,13 +212,17 @@ export default function HomeScreen() {
         {/* ── Search & Filter ─────────────────────────────── */}
         <View style={styles.searchRow}>
           <View style={styles.searchBox}>
-            <Search size={14} color="#475569" strokeWidth={2.5} />
+            <Search size={16} color="#475569" strokeWidth={2.5} />
             <TextInput
               placeholder="Search events, people..."
-              placeholderTextColor="#334155"
+              placeholderTextColor="#475569"
               style={styles.searchInput}
               value={searchQuery}
               onChangeText={setSearchQuery}
+              autoCorrect={false}
+              autoCapitalize="none"
+              clearButtonMode="while-editing"
+              returnKeyType="search"
             />
           </View>
           <View style={styles.filterWrapper}>
@@ -258,6 +283,29 @@ export default function HomeScreen() {
             )}
           </View>
         </View>
+
+        {/* Search Mode Tabs */}
+        {searchQuery.length > 0 && (
+          <View style={styles.searchModeContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.searchModeScroll}>
+              {SEARCH_MODES.map((mode) => {
+                const isActive = searchMode === mode;
+                return (
+                  <TouchableOpacity
+                    key={mode}
+                    onPress={() => setSearchMode(mode)}
+                    style={[styles.searchModeBtn, isActive && styles.searchModeBtnActive]}
+                  >
+                    <Text style={[styles.searchModeText, isActive && styles.searchModeTextActive]}>
+                      {mode}
+                    </Text>
+                    {isActive && <View style={styles.searchModeIndicator} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
 
         {/* ── Category Carousel ───────────────────────────── */}
         <CategoryScroll />
@@ -392,12 +440,12 @@ const styles = StyleSheet.create({
   searchRow: { flexDirection: 'row', gap: 8, marginBottom: 18, zIndex: 1000 },
   searchBox: {
     flex: 1,
+    height: 42,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: BG.card,
     borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 10,
     borderWidth: 1,
     borderColor: BG.border,
     gap: 8,
@@ -467,4 +515,42 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingVertical: 60 },
   emptyTitle: { fontSize: 16, fontWeight: FW.header, color: '#334155', marginBottom: 4 },
   emptySub: { fontSize: 13, color: '#1E2A40' },
+  searchModeContainer: {
+    marginBottom: 20,
+    marginTop: -4,
+  },
+  searchModeScroll: {
+    gap: 8,
+  },
+  searchModeBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: BG.card,
+    borderWidth: 1,
+    borderColor: BG.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchModeBtnActive: {
+    backgroundColor: 'rgba(129, 140, 248, 0.1)',
+    borderColor: 'rgba(129, 140, 248, 0.3)',
+  },
+  searchModeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  searchModeTextActive: {
+    color: '#818CF8',
+    fontWeight: '800',
+  },
+  searchModeIndicator: {
+    position: 'absolute',
+    bottom: 4,
+    width: 12,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: '#818CF8',
+  },
 });

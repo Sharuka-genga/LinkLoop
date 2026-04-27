@@ -110,12 +110,15 @@ export async function getEvents() {
     if (error) throw error;
     
     // Flatten data for easier consumption
-    return data.map(event => ({
-        ...event,
-        creatorName: event.host?.full_name || "Unknown User",
-        creatorAvatar: event.host?.profile_picture_url,
-        participantsCount: event.participants?.[0]?.count || 0
-    }));
+    return data.map(event => {
+        const hostData = Array.isArray(event.host) ? event.host[0] : event.host;
+        return {
+            ...event,
+            creatorName: hostData?.full_name || "Unknown User",
+            creatorAvatar: hostData?.profile_picture_url,
+            participantsCount: event.participants?.[0]?.count || 0
+        };
+    });
 }
 
 // ── Join an event (Direct mode) ───────────────────────────────
@@ -195,16 +198,26 @@ export async function sendInvitation(eventId: string, receiverId: string) {
     const senderId = await getCurrentUserId();
     const { data, error } = await supabase
         .from("event_invitations")
-        .insert({
+        .upsert({
             event_id: eventId,
             sender_id: senderId,
             receiver_id: receiverId,
             status: "pending",
-        })
+        }, { onConflict: 'event_id,receiver_id' })
         .select()
         .single();
 
     if (error) {
+        // If it's a duplicate key error, we can just return the existing record (or handle as success)
+        if (error.code === '23505') {
+            const { data: existing } = await supabase
+                .from("event_invitations")
+                .select("*")
+                .eq("event_id", eventId)
+                .eq("receiver_id", receiverId)
+                .single();
+            return existing;
+        }
         console.error("Supabase error sending invitation:", error);
         throw error;
     }

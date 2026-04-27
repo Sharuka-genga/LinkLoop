@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
-import { View, Text, StyleSheet, Image, TouchableOpacity, Alert, type ImageStyle, type ViewStyle, type TextStyle } from "react-native";
-import { MapPin, Clock, Users, ChevronRight, Zap, MessageCircle, CheckCircle, Pencil, Trash2 } from "lucide-react-native";
+import { checkIfJoined, deleteEvent, joinEvent, requestToJoin } from "@/lib/events";
 import { useRouter } from "expo-router";
-import { deleteEvent, joinEvent, requestToJoin, checkIfJoined } from "@/lib/events";
+import { CheckCircle, ChevronRight, Clock, MapPin, MessageCircle, Pencil, Trash2, Users, Zap } from "lucide-react-native";
+import { useEffect, useState } from "react";
+import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 type Props = {
   id: string;

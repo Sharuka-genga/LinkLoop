@@ -1,61 +1,56 @@
-import { BG, BR, FW, TX } from "@/constants/theme";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { ArrowRight, ChevronRight } from "lucide-react-native";
+import { ArrowRight } from "lucide-react-native";
 import React, { useRef, useState } from "react";
 import {
   Animated,
+  Dimensions,
   FlatList,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  ViewToken,
-  useWindowDimensions,
+  ViewToken
 } from "react-native";
 
-
+const { width, height } = Dimensions.get("window");
 
 // ── Onboarding Data ──────────────────────────────────────────────────────────
 const SLIDES = [
   {
     id: "1",
     image: require("@/assets/images/onboarding1.png"),
-    title: "Find Your\nPerfect Companion",
-    description:
-      "Connect with fellow students who share your passion for sports and academic goals.",
-    accent: "#818CF8", // indigo
-    gradient: ["rgba(8, 14, 28, 0)", "rgba(8, 14, 28, 0.8)", "#080E1C"],
+    title: "Find Your\nPerfect Circle",
+    highlight: "Circle",
+    description: "Connect with students who share your passion for sports and academic goals.",
+    color: "#818CF8",
   },
   {
     id: "2",
     image: require("@/assets/images/onboarding2.png"),
-    title: "Create Events &\nJoin Effortlessly",
-    description: "Organise events, and grow your circle — all in one place.",
-    accent: "#38BDF8", // sky
-    gradient: ["rgba(8, 14, 28, 0)", "rgba(8, 14, 28, 0.8)", "#080E1C"],
+    title: "Events Made\nEffortless",
+    highlight: "Effortless",
+    description: "Organise games, study sessions, and social events — all in one place.",
+    color: "#818CF8",
   },
   {
     id: "3",
     image: require("@/assets/images/onboarding3.png"),
-    title: "Smart Picks &\nEpic Rewards",
-    description:
-      "Get AI-powered recommendations, timely reminders, and earn badges as you level up.",
-    accent: "#FBBF24", // gold
-    gradient: ["rgba(8, 14, 28, 0)", "rgba(8, 14, 28, 0.8)", "#080E1C"],
+    title: "Earn Rewards &\nLevel Up",
+    highlight: "Rewards",
+    description: "Get smart recommendations and earn badges as you grow your campus presence.",
+    color: "#818CF8",
   },
 ] as const;
 
 type Slide = (typeof SLIDES)[number];
 
 export default function OnboardingScreen() {
-  const { width, height } = useWindowDimensions();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList<Slide>>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
-
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -69,49 +64,60 @@ export default function OnboardingScreen() {
     viewAreaCoveragePercentThreshold: 50,
   }).current;
 
+  const isLastSlide = currentIndex === SLIDES.length - 1;
+  const currentSlide = SLIDES[currentIndex] || SLIDES[0];
+
   function handleNext() {
-    if (currentIndex < SLIDES.length - 1) {
+    const nextIndex = currentIndex + 1;
+    if (nextIndex < SLIDES.length) {
       flatListRef.current?.scrollToIndex({
-        index: currentIndex + 1,
+        index: nextIndex,
         animated: true,
       });
+      // Optionally update state immediately for better UI response
+      setCurrentIndex(nextIndex);
     }
   }
 
   async function handleGetStarted() {
     try {
       await AsyncStorage.setItem("hasSeenOnboarding", "true");
-    } catch (_) {}
-    router.replace("/(auth)/login" as any);
+    } catch (_) { }
+    router.replace("/login" as any);
   }
-
-  const isLastSlide = currentIndex === SLIDES.length - 1;
-  const currentAccent = SLIDES[currentIndex].accent;
 
   function renderSlide({ item, index }: { item: Slide; index: number }) {
     const inputRange = [(index - 1) * width, index * width, (index + 1) * width];
-    
-    const imageScale = scrollX.interpolate({
+    const scale = scrollX.interpolate({
       inputRange,
-      outputRange: [1.08, 1, 1.08],
+      outputRange: [1.1, 1, 1.1],
       extrapolate: "clamp",
     });
 
-
     return (
-      <View style={[styles.slide, { width }]}>
-        <Animated.Image
-          source={item.image}
-          style={[
-            styles.backgroundImage,
-            { transform: [{ scale: imageScale }] }
-          ]}
-          resizeMode="cover"
-        />
-        <LinearGradient
-          colors={item.gradient as any}
-          style={styles.gradientOverlay}
-        />
+      <View style={[styles.slide, { width, height }]}>
+        <View style={styles.imageContainer}>
+          <Animated.Image
+            source={item.image}
+            style={[styles.image, { transform: [{ scale }] }]}
+            resizeMode="cover"
+          />
+          <LinearGradient
+            colors={["transparent", "rgba(8,14,28,0.4)", "#080E1C"]}
+            style={styles.imageOverlay}
+          />
+        </View>
+
+        <View style={styles.textSection}>
+          <View style={styles.titleWrapper}>
+            <Text style={styles.title}>
+              {item.title.split(item.highlight)[0]}
+              <Text style={{ color: item.color }}>{item.highlight}</Text>
+              {item.title.split(item.highlight)[1]}
+            </Text>
+          </View>
+          <Text style={styles.description}>{item.description}</Text>
+        </View>
       </View>
     );
   }
@@ -120,18 +126,7 @@ export default function OnboardingScreen() {
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      {/* Skip Button */}
-      {!isLastSlide && (
-        <TouchableOpacity
-          style={styles.skipBtn}
-          onPress={handleGetStarted}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.skipText}>Skip</Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Background Images */}
+      {/* Layer 1: Swipeable Content */}
       <View style={StyleSheet.absoluteFill}>
         <Animated.FlatList
           ref={flatListRef}
@@ -143,78 +138,71 @@ export default function OnboardingScreen() {
           showsHorizontalScrollIndicator={false}
           onScroll={Animated.event(
             [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-            { useNativeDriver: true },
+            { useNativeDriver: false },
           )}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
           scrollEventThrottle={16}
+          bounces={false}
+          getItemLayout={(_, index) => ({
+            length: width,
+            offset: width * index,
+            index,
+          })}
         />
       </View>
 
-      {/* Content Container */}
-      <View style={styles.contentContainer} pointerEvents="box-none">
-        <View style={styles.spacer} />
-        
-        <View style={styles.textSection}>
-          {/* Animated Indicators */}
-          <View style={styles.indicatorsContainer}>
+      {/* Layer 2: Interactive UI */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+        {/* Skip Button */}
+        <TouchableOpacity
+          style={styles.skipBtn}
+          onPress={handleGetStarted}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.skipText}>Skip</Text>
+        </TouchableOpacity>
+
+        {/* Footer Controls */}
+        <View style={styles.footer} pointerEvents="box-none">
+          <View style={styles.pagination}>
             {SLIDES.map((_, i) => {
               const inputRange = [(i - 1) * width, i * width, (i + 1) * width];
-              
               const dotWidth = scrollX.interpolate({
                 inputRange,
-                outputRange: [1, 4, 1], // Scale factor
+                outputRange: [6, 20, 6],
                 extrapolate: "clamp",
               });
-              
               const opacity = scrollX.interpolate({
                 inputRange,
                 outputRange: [0.3, 1, 0.3],
                 extrapolate: "clamp",
               });
-
               return (
                 <Animated.View
                   key={i}
-                  style={[
-                    styles.indicator,
-                    { 
-                      transform: [{ scaleX: dotWidth }],
-                      opacity,
-                      backgroundColor: "#818CF8" // Use consistent theme color
-                    },
-                  ]}
-
+                  style={[styles.dot, { width: dotWidth, opacity, backgroundColor: currentSlide.color }]}
                 />
               );
-
             })}
           </View>
 
-          {/* Title */}
-          <Animated.Text style={styles.title}>
-            {SLIDES[currentIndex].title}
-          </Animated.Text>
-
-          {/* Description */}
-          <Text style={styles.description}>
-            {SLIDES[currentIndex].description}
-          </Text>
-
-          {/* CTA Footer */}
-          <View style={styles.footer}>
-            <TouchableOpacity
-              style={[styles.mainButton, { backgroundColor: "#818CF8" }]}
-
-              onPress={isLastSlide ? handleGetStarted : handleNext}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.mainButtonText}>
-                {isLastSlide ? "Get Started" : "Next Step"}
-              </Text>
-              <ArrowRight size={20} color="#fff" strokeWidth={2.5} />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={[styles.mainButton, { backgroundColor: currentSlide.color }]}
+            onPress={() => {
+              if (isLastSlide) {
+                handleGetStarted();
+              } else {
+                handleNext();
+              }
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.mainButtonText}>
+              {isLastSlide ? "Get Started" : "Continue"}
+            </Text>
+            <ArrowRight size={20} color="#000" strokeWidth={3} />
+          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -224,96 +212,101 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: BG.main,
+    backgroundColor: "#080E1C",
   },
   slide: {
-    flex: 1,
+    width: width,
+    height: height,
   },
-  backgroundImage: {
-    ...StyleSheet.absoluteFillObject,
+  imageContainer: {
+    width: width,
+    height: height * 0.52,
+    overflow: "hidden",
   },
-
-  gradientOverlay: {
-    ...StyleSheet.absoluteFillObject,
+  image: {
+    width: "100%",
+    height: "100%",
   },
-  contentContainer: {
-    flex: 1,
-    zIndex: 10,
-  },
-  spacer: {
-    flex: 1,
+  imageOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 120,
   },
   textSection: {
-    paddingHorizontal: 32,
-    paddingBottom: 60,
-  },
-  indicatorsContainer: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 24,
-  },
-  indicator: {
-    height: 6,
-    width: 6,
-    borderRadius: 3,
-  },
-
-  title: {
-    fontSize: 40,
-    fontWeight: FW.hero,
-    color: TX.primary,
-    lineHeight: 48,
-    marginBottom: 16,
-    letterSpacing: -0.5,
-  },
-  description: {
-    fontSize: 17,
-    color: TX.secondary,
-    lineHeight: 26,
-    fontWeight: FW.caption,
-    marginBottom: 40,
-    opacity: 0.9,
-  },
-  footer: {
-    flexDirection: "row",
+    flex: 1,
+    paddingHorizontal: 40,
+    paddingTop: 20,
     alignItems: "center",
   },
+  titleWrapper: {
+    height: 100,
+    justifyContent: "center",
+  },
+  title: {
+    fontSize: 34,
+    fontWeight: "900",
+    color: "#F1F5F9",
+    textAlign: "center",
+    lineHeight: 42,
+    letterSpacing: -1,
+  },
+  description: {
+    fontSize: 16,
+    color: "#94A3B8",
+    textAlign: "center",
+    lineHeight: 24,
+    fontWeight: "600",
+    marginTop: 10,
+  },
+  footer: {
+    position: "absolute",
+    bottom: 60,
+    left: 40,
+    right: 40,
+    gap: 30,
+  },
+  pagination: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
+  },
+  dot: {
+    height: 6,
+    borderRadius: 3,
+  },
   mainButton: {
-    flex: 1,
     height: 64,
     borderRadius: 20,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
+    gap: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
-    shadowRadius: 20,
+    shadowRadius: 15,
     elevation: 10,
   },
   mainButtonText: {
-    color: "#fff",
     fontSize: 18,
-    fontWeight: FW.header,
+    fontWeight: "800",
+    color: "#000",
     letterSpacing: 0.5,
   },
   skipBtn: {
     position: "absolute",
     top: 60,
-    right: 24,
-    zIndex: 20,
+    right: 32,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(0,0,0,0.3)",
   },
-
   skipText: {
-    color: "#fff",
+    color: "#CBD5E1",
     fontSize: 14,
-    fontWeight: FW.body,
+    fontWeight: "700",
   },
 });
