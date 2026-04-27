@@ -105,9 +105,9 @@ export default function HomeScreen() {
   useEffect(() => {
     loadEvents();
 
-    // Subscribe to realtime changes
+    // Subscribe to realtime changes with a unique channel name to avoid reuse errors
     const channel = supabase
-      .channel('schema-db-changes')
+      .channel(`index-events-${Date.now()}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'events' },

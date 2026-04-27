@@ -276,7 +276,7 @@ export default function ChatScreen() {
     loadInitialData();
 
     const voteSub = supabase
-      .channel('advanced_chat_changes')
+      .channel(`chat-votes-${eventId}-${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
         if (payload.eventType === 'UPDATE' && payload.new.is_pinned !== undefined) {
            loadInitialData(); // Refresh to get correct pinned state
@@ -290,7 +290,7 @@ export default function ChatScreen() {
     // ✅ NEW: Live DB presence subscription — keeps yellow dot accurate
     // Watches profiles.is_online changes for all event participants in real-time
     const presenceSub = supabase
-      .channel(`db_presence:${eventId}`)
+      .channel(`db-presence-${eventId}-${Date.now()}`)
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
