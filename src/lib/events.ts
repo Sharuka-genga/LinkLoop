@@ -127,7 +127,10 @@ export async function joinEvent(eventId: string) {
         .select()
         .single();
 
-    if (error) throw error;
+    if (error) {
+        if (error.code === '23505') return { alreadyJoined: true };
+        throw error;
+    }
 
     // Notify the event creator that someone joined their event directly
     try {
@@ -175,7 +178,10 @@ export async function requestToJoin(eventId: string) {
         .select()
         .single();
 
-    if (error) throw error;
+    if (error) {
+        if (error.code === '23505') return { alreadyRequested: true };
+        throw error;
+    }
     return data;
 }
 
@@ -240,6 +246,10 @@ export async function sendInvitation(eventId: string, receiverId: string) {
         .single();
 
     if (error) {
+        if (error.code === '23505') {
+            // Silence duplicate key errors — the invitation already exists
+            return { alreadySent: true };
+        }
         console.error("Supabase error sending invitation:", error);
         throw error;
     }
