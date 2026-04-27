@@ -1,15 +1,16 @@
+import { cancelJoinRequest, sendJoinRequest } from "@/lib/requests";
+import { supabase } from "@/lib/supabase";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { sendJoinRequest, cancelJoinRequest } from "@/lib/requests";
 import React, { useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  ScrollView,
   Alert,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 type RequestStatus = "none" | "pending";
@@ -33,7 +34,84 @@ export default function EventDetails() {
   const total = Number(params.total ?? 0);
   const initialJoined = Number(params.joined ?? 0);
 
+  const joinMode = typeof params.joinMode === "string" ? params.joinMode : "request";
+
   const [requestStatus, setRequestStatus] = useState<RequestStatus>("none");
+  const [joined, setJoined] = useState(false);
+
+  const handleJoin = async () => {
+    if (!eventId) {
+      Alert.alert("Error", "Invalid event ID");
+      return;
+    }
+
+    if (joinMode === "direct") {
+      // Direct join - instantly join the event
+      try {
+        const { joinEvent } = await import("@/lib/events");
+        await joinEvent(eventId);
+        setJoined(true);
+        Alert.alert("Success", "You have joined the event!");
+      } catch (err: any) {
+        Alert.alert("Error", err?.message || "Failed to join event");
+      }
+    } else {
+      // Request join - send a request to the event creator
+      try {
+        await sendJoinRequest(eventId);
+        setRequestStatus("pending");
+        Alert.alert("Request Sent", "Your request has been sent to the event creator.");
+      } catch (err: any) {
+        Alert.alert("Error", err?.message || "Failed to send request");
+      }
+    }
+  };
+
+
+    const handleLeave = async () => {
+    if (!eventId) {
+      Alert.alert("Error", "Invalid event ID");
+      return;
+    }
+
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Delete from event_participants
+      const { error } = await supabase
+        .from("event_participants")
+        .delete()
+        .eq("event_id", eventId)
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+
+      setJoined(false);
+      Alert.alert("Left Event", "You have left the event.");
+    } catch (err: any) {
+      Alert.alert("Error", err?.message || "Failed to leave event");
+    }
+  };
+  
+  /*const handleLeave = async () => {
+    if (!eventId) {
+      Alert.alert("Error", "Invalid event ID");
+      return;
+    }
+
+    try {
+      const { leaveEvent } = await import("@/lib/events");
+      await leaveEvent(eventId);
+      setJoined(false);
+      Alert.alert("Left Event", "You have left the event.");
+    } catch (err: any) {
+      Alert.alert("Error", err?.message || "Failed to leave event");
+    }
+  };
+
+  /*const [requestStatus, setRequestStatus] = useState<RequestStatus>("none");
 
   const handleRequest = async () => {
   if (!eventId) {
@@ -52,6 +130,22 @@ export default function EventDetails() {
     alert(`Failed to send request: ${err?.message || "Unknown error"}`);
   }
 };
+  const handleCancelRequest = async () => {
+    if (!eventId) {
+      Alert.alert("Error", "Event ID not found");
+      return;
+    }
+
+    try {
+      await cancelJoinRequest(eventId);
+      setRequestStatus("none");
+      Alert.alert("Success", "Request cancelled!");
+    } catch (err) {
+      console.error("Failed to cancel request:", err);
+      Alert.alert("Error", "Failed to cancel request");
+    }
+  };*/
+
   const handleCancelRequest = async () => {
     if (!eventId) {
       Alert.alert("Error", "Event ID not found");
@@ -103,10 +197,31 @@ export default function EventDetails() {
           <Text style={styles.value}>{description}</Text>
         </View>
 
-        {requestStatus === "none" ? (
+        {/* {requestStatus === "none" ? (
           <TouchableOpacity style={styles.requestBtn} onPress={handleRequest}>
             <Text style={styles.requestText}>Request to Join</Text>
           </TouchableOpacity>
+        ) : (*/}
+
+        {requestStatus === "none" && !joined ? (
+          <TouchableOpacity style={styles.requestBtn} onPress={handleJoin}>
+            <Text style={styles.requestText}>
+              {joinMode === "direct" ? "Join Event" : "Request to Join"}
+            </Text>
+          </TouchableOpacity>
+        ) : joined ? (
+          <View>
+            <View style={styles.joinedCard}>
+              <Text style={styles.joinedText}>✓ You have joined this event</Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.leaveBtn}
+              onPress={handleLeave}
+            >
+              <Text style={styles.leaveText}>Leave Event</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           <>
             <View style={styles.pendingCard}>
@@ -145,6 +260,20 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 40,
   },
+
+  leaveBtn: {
+    marginTop: 12,
+    backgroundColor: "#F87171",
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: "center",
+  },
+  leaveText: {
+    color: "#0F172A",
+    fontWeight: "800",
+    fontSize: 14,
+  },
+
   back: {
     color: "#818CF8",
     fontSize: 14,
@@ -196,6 +325,20 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: "center",
   },
+
+  joinedCard: {
+    marginTop: 18,
+    backgroundColor: "#34D399",
+    borderRadius: 16,
+    padding: 14,
+    alignItems: "center",
+  },
+  joinedText: {
+    color: "#0F172A",
+    fontWeight: "800",
+    fontSize: 14,
+  },
+
   requestText: {
     color: "#0F172A",
     fontWeight: "800",

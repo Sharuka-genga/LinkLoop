@@ -1,19 +1,22 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
   ActivityIndicator,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import {
+/*import {
   getEventsForSuggestions,
   getTimeSlotFromEventTime,
-} from "@/lib/events";
+} from "@/lib/events";*/
+import { supabase } from "@/lib/supabase";
+
+
 
 type EventItem = {
   id: string;
@@ -24,6 +27,7 @@ type EventItem = {
   event_time: string;
   people_needed: number;
   status: string;
+  join_mode: string;   // ← Add this line (line 27)
   description?: string;
 };
 
@@ -44,6 +48,29 @@ export default function Suggestions() {
   useEffect(() => {
     loadEvents();
   }, []);
+
+  function getTimeSlotFromEventTime(eventTime: string): string {
+    if (!eventTime) return "";
+    const hour = parseInt(eventTime.split(":")[0], 10);
+    if (hour >= 6 && hour < 12) return "Morning";
+    if (hour >= 12 && hour < 17) return "Afternoon";
+    if (hour >= 17 && hour < 21) return "Evening";
+    return "Night";
+  }
+
+  async function getEventsForSuggestions() {
+    const { data, error } = await supabase
+      .from("events")
+      .select("*")
+      .eq("status", "active")
+      .order("event_date", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching events:", error);
+      return [];
+    }
+    return data || [];
+  }
 
   const loadEvents = async () => {
     try {
@@ -178,7 +205,7 @@ export default function Suggestions() {
                         item.location || "Campus"
                       )}&description=${encodeURIComponent(
                         item.description || "No description available"
-                      )}&joined=0&total=${item.people_needed}`
+                      )}&joined=0&total=${item.people_needed}&joinMode=${item.join_mode || "request"}`
                     )
                   }
                 >
