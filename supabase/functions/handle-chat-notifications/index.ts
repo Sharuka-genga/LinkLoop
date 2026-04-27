@@ -28,6 +28,10 @@ serve(async (req) => {
       .eq('id', record.event_id)
       .single();
 
+    if (!event) {
+      return new Response(JSON.stringify({ error: "Event not found" }), { status: 404 });
+    }
+
     // 4. Format Sender Identity
     let senderName = "Someone";
     if (record.is_anonymous) {
@@ -53,20 +57,47 @@ serve(async (req) => {
 
     // 6. Create notifications in DB for all recipients
     if (recipientIds.size > 0) {
+      let notificationTitle = `New message in ${event.title || 'Event'}`;
+      let notificationBody = record.is_anonymous 
+        ? "Someone sent a message" 
+        : `${senderName}: ${record.content.substring(0, 100)}`;
+      
+      // Handle different message types
+      if (record.message_type === 'image') {
+        notificationTitle = `New image in ${event.title || 'Event'}`;
+        notificationBody = record.is_anonymous ? "Someone shared an image" : `${senderName} shared an image`;
+      } else if (record.message_type === 'poll') {
+        notificationTitle = `New poll in ${event.title || 'Event'}`;
+        notificationBody = record.is_anonymous ? "Someone created a poll" : `${senderName} created a poll`;
+      }
+
       const notificationRows = Array.from(recipientIds).map(userId => ({
         user_id: userId,
         actor_id: record.sender_id,
         event_id: record.event_id,
-        type: 'message',
-        title: `New message in ${event?.title || 'Group'}`,
-        body: record.is_anonymous ? "Someone sent a message" : `${senderName}: ${record.content.substring(0, 100)}`,
-        data: { eventId: record.event_id, messageId: record.id }
+        type: record.message_type === 'poll' ? 'poll_created' : 'message',
+        title: notificationTitle,
+        body: notificationBody,
+        data: { 
+          eventId: record.event_id, 
+          messageId: record.id,
+          messageType: record.message_type
+        }
       }));
 
-      await supabase.from('notifications').insert(notificationRows);
+      const { error: notificationError } = await supabase.from('notifications').insert(notificationRows);
+      
+      if (notificationError) {
+        console.error('Failed to create notifications:', notificationError);
+        return new Response(JSON.stringify({ error: notificationError.message }), { status: 500 });
+      }
     }
 
-    return new Response(JSON.stringify({ success: true, notified_count: recipientIds.size }), { headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ 
+      success: true, 
+      notified_count: recipientIds.size,
+      event_title: event.title 
+    }), { headers: { "Content-Type": "application/json" } });
   } catch (error: any) {
     console.error("Error in handle-chat-notifications:", error);
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });

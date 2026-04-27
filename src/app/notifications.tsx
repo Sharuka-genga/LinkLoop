@@ -1,4 +1,4 @@
-import { Bell, ChevronLeft, MessageSquare, UserPlus, CheckCircle, Clock, X, Check, MoreHorizontal, Heart, MessageCircle, Trash2 } from "lucide-react-native";
+import { Bell, ChevronLeft, MessageSquare, UserPlus, CheckCircle, Clock, X, Check, MoreHorizontal, Heart, MessageCircle, Trash2, ShieldAlert, BarChart2 } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { getNotifications, markNotificationAsRead, subscribeToNotifications, handleNotificationAction, deleteNotification, Notification as NotifType } from "@/lib/notifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -20,6 +20,10 @@ const NOTIFICATION_ICONS: Record<string, any> = {
     request_rejected: { icon: X, color: "#F87171", bg: "rgba(248,113,113,0.15)", label: "Update" },
     reminder: { icon: Clock, color: "#94A3B8", bg: "rgba(148,163,184,0.15)", label: "Reminder" },
     social_activity: { icon: Heart, color: "#F472B6", bg: "rgba(244,114,182,0.15)", label: "Social" },
+    screenshot_detected: { icon: ShieldAlert, color: "#EF4444", bg: "rgba(239,68,68,0.15)", label: "Security" },
+    poll_created: { icon: BarChart2, color: "#818CF8", bg: "rgba(129,140,248,0.15)", label: "Poll" },
+    poll_vote: { icon: BarChart2, color: "#A78BFA", bg: "rgba(167,139,250,0.15)", label: "Poll" },
+    media_request: { icon: MessageCircle, color: "#F59E0B", bg: "rgba(245,158,11,0.15)", label: "Media" },
 };
 
 type SectionData = {
@@ -34,6 +38,8 @@ const NotificationItem = ({
     onRead, 
     showOptions 
 }: { 
+    item: NotifType;
+    onDelete: (id: string) => void;
     onJoin: (item: NotifType) => void; 
     onRead: (id: string, route?: string) => void;
     showOptions: (item: NotifType) => void;
@@ -41,6 +47,9 @@ const NotificationItem = ({
     const config = NOTIFICATION_ICONS[item.type] || NOTIFICATION_ICONS.reminder;
     const Icon = config.icon;
     const isActionable = (item.type === 'invitation' || item.type === 'join_request') && !item.is_read;
+
+    // Derive avatar: actor's profile picture > data.avatar > null (shows icon)
+    const avatarUri = item.actor?.profile_picture_url || item.data?.avatar || null;
 
     const renderRightActions = (progress: any, dragX: any) => {
         const trans = dragX.interpolate({
@@ -96,8 +105,8 @@ const NotificationItem = ({
             >
                 <View style={styles.notifMain}>
                     <View style={styles.avatarContainer}>
-                        {item.data?.avatar ? (
-                            <Image source={{ uri: item.data.avatar }} style={styles.avatar} />
+                        {avatarUri ? (
+                            <Image source={{ uri: avatarUri }} style={styles.avatar} />
                         ) : (
                             <View style={[styles.iconContainer, { backgroundColor: config.bg }]}>
                                 <Icon size={18} color={config.color} strokeWidth={2.5} />

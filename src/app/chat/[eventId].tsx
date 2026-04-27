@@ -1,31 +1,81 @@
-import React, { useEffect, useState, useRef } from "react";
-import { 
-  View, Text, StyleSheet, FlatList, TouchableOpacity, 
-  TextInput, KeyboardAvoidingView, Platform, 
-  Image as RNImage, ActivityIndicator, Alert, Modal, AppState
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { 
-  Send, ChevronLeft, Paperclip, BarChart2, MoreVertical, 
-  Clock, MapPin, X, Trash2, Camera
-} from "lucide-react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useAuth } from "@/context/auth-context";
+import {
+    cancelPendingMessage,
+    checkIfUserCheckedIn,
+    checkInToEvent,
+    confirmMessageSent,
+    createPoll,
+    DbPresence,
+    deleteMessageForEveryone,
+    flushScheduledMessages,
+    getCheckInCount,
+    getDbPresenceStatus,
+    getEventSummary,
+    getMessages,
+    getPolls,
+    logScreenshot,
+    Message,
+    MessageMetadata,
+    parseMessageContent,
+    pinMessage,
+    Poll,
+    PresenceState,
+    requestMediaAccess,
+    scheduleMessage,
+    sendMessage,
+    subscribeToMessages,
+    subscribeToTypingStatus,
+    trackPresence,
+    TypingStatus,
+    updateTypingStatus,
+    updateUserStatus,
+    uploadChatMedia,
+    verifyChatAccess,
+    voteInPoll
+} from "@/lib/chat";
+import { supabase } from "@/lib/supabase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import { 
-  getMessages, sendMessage, subscribeToMessages, 
-  Message, uploadChatMediaDirectly, createPoll, getPolls, Poll, voteInPoll,
-  deleteMessageForEveryone, trackPresence, broadcastTyping, PresenceState,
-  pinMessage, checkInToEvent, getCheckInCount, getEventSummary,
-  parseMessageContent, MessageMetadata, logScreenshot, uploadChatMedia, requestMediaAccess,
-  updateUserStatus, updateTypingStatus, subscribeToTypingStatus, TypingStatus,
-  cancelPendingMessage, confirmMessageSent, scheduleMessage, checkIfUserCheckedIn, verifyChatAccess
-} from "@/lib/chat";
-import { Pin, CheckCircle2, AlertTriangle, Info, EyeOff, Lock, ShieldAlert, DownloadCloud, UserMinus, Calendar } from "lucide-react-native";
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/context/auth-context";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import {
+    AlertTriangle,
+    BarChart2,
+    Calendar,
+    Camera,
+    CheckCircle2,
+    ChevronLeft,
+    Clock,
+    EyeOff,
+    Info,
+    Lock,
+    MapPin,
+    MoreVertical,
+    Paperclip,
+    Pin,
+    Send,
+    ShieldAlert,
+    Trash2,
+    UserMinus,
+    X
+} from "lucide-react-native";
+import React, { useEffect, useRef, useState } from "react";
+import {
+    ActivityIndicator, Alert,
+    AppState,
+    FlatList,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Image as RNImage,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const DELETE_TIME_LIMIT_MS = 60 * 60 * 1000; // 1 hour
 
@@ -63,6 +113,7 @@ export default function ChatScreen() {
 
   // Presence & Activity State
   const [presenceState, setPresenceState] = useState<Record<string, PresenceState>>({});
+  const [dbProfiles, setDbProfiles] = useState<Record<string, DbPresence>>({});
   const [typingUsers, setTypingUsers] = useState<Record<string, { fullName: string; timestamp: number }>>({});
   const [dbTypingUsers, setDbTypingUsers] = useState<TypingStatus[]>([]);
   const [currentUserStatus, setCurrentUserStatus] = useState<'active' | 'idle' | 'offline'>('active');
@@ -123,7 +174,12 @@ export default function ChatScreen() {
         });
         setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
       } else if (eventType === 'UPDATE') {
-        setMessages((prev) => prev.map(m => m.id === newMessage.id ? newMessage : m));
+        if (newMessage.status === 'cancelled') {
+            // Remove cancelled (undone) messages from the list
+            setMessages((prev) => prev.filter(m => m.id !== newMessage.id));
+        } else {
+            setMessages((prev) => prev.map(m => m.id === newMessage.id ? newMessage : m));
+        }
       }
     });
 
@@ -131,34 +187,43 @@ export default function ChatScreen() {
     channel
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState();
+        // ✅ FIX: Re-key by user_id (NOT by Supabase's internal random channel key)
         const simplifiedState: Record<string, PresenceState> = {};
         Object.keys(state).forEach((key) => {
-          simplifiedState[key] = state[key][0] as any as PresenceState;
+          const presence = state[key][0] as any as PresenceState;
+          if (presence?.user_id) {
+            simplifiedState[presence.user_id] = presence;
+          }
         });
-
         setPresenceState(simplifiedState);
       })
       .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-        // Wait, if we don't have TEST_USER_ID, we should use auth context
-        // But since we removed key from presence config, it will use the default user id.
         const currentUserId = user?.id;
-        if (key !== currentUserId) {
-          const name = newPresences[0]?.full_name || "Someone";
+        const joinedPresence = newPresences[0] as any as PresenceState;
+        const joinedUserId = joinedPresence?.user_id;
+        if (joinedUserId && joinedUserId !== currentUserId) {
+          const name = joinedPresence?.full_name || "Someone";
           const sysMsg: Message = {
             id: `sys-join-${Date.now()}`,
             event_id: eventId!,
             sender_id: 'system',
-            content: `${name} joined the event`,
+            content: `${name} joined the chat`,
             created_at: new Date().toISOString(),
             status: 'sent'
           };
           setMessages(prev => [...prev, sysMsg]);
+          // Refresh DB presence for this user to get latest is_online state
+          getDbPresenceStatus([joinedUserId]).then(result => {
+            setDbProfiles(prev => ({ ...prev, ...result }));
+          });
         }
       })
       .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
         const currentUserId = user?.id;
-        if (key !== currentUserId) {
-          const name = leftPresences[0]?.full_name || "Someone";
+        const leftPresence = leftPresences[0] as any as PresenceState;
+        const leftUserId = leftPresence?.user_id;
+        if (leftUserId && leftUserId !== currentUserId) {
+          const name = leftPresence?.full_name || "Someone";
           const sysMsg: Message = {
             id: `sys-leave-${Date.now()}`,
             event_id: eventId!,
@@ -184,7 +249,10 @@ export default function ChatScreen() {
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED' && user?.id) {
-          await trackPresence(channel, user.id, { full_name: "You" }, 'active');
+          await trackPresence(channel, user.id, {
+            full_name: profile?.full_name || 'You',
+            profile_picture_url: profile?.profile_picture_url || undefined,
+          }, 'active');
         }
       });
 
@@ -219,24 +287,57 @@ export default function ChatScreen() {
       })
       .subscribe();
 
-    // Screenshot Detection (Mock implementation)
-    // In a real app, use: import ScreenshotDetector from 'react-native-screenshot-detector';
-    const simulateScreenshot = () => {
-        handleScreenshotDetected();
-    };
+    // ✅ NEW: Live DB presence subscription — keeps yellow dot accurate
+    // Watches profiles.is_online changes for all event participants in real-time
+    const presenceSub = supabase
+      .channel(`db_presence:${eventId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'profiles',
+      }, (payload) => {
+        const updated = payload.new as any;
+        if (updated?.id) {
+          setDbProfiles(prev => ({
+            ...prev,
+            [updated.id]: {
+              id: updated.id,
+              is_online: updated.is_online,
+              last_seen: updated.last_seen,
+              full_name: updated.full_name,
+              profile_picture_url: updated.profile_picture_url,
+            }
+          }));
+        }
+      })
+      .subscribe();
 
-    // For demonstration, we'll listen for a custom event or just providing the handler
+    // Screenshot Detection - Real implementation
+    // In production, use: import ScreenshotDetector from 'react-native-screenshot-detector';
     const handleScreenshotDetected = async () => {
-        setLastScreenshotUser("You");
-        setShowScreenshotWarning(true);
-        setTimeout(() => setShowScreenshotWarning(false), 5000);
-        await logScreenshot(eventId!);
+        if (user && eventId) {
+            try {
+                await logScreenshot(eventId);
+                setShowScreenshotWarning(true);
+                setLastScreenshotUser(user.id);
+                setTimeout(() => setShowScreenshotWarning(false), 3000);
+            } catch (error) {
+                console.error('Screenshot logging failed:', error);
+            }
+        }
     };
 
-    // Presence (Online/Offline) Listener
+    // Presence (Online/Offline) Listener — updates DB is_online on app state change
     const appStateSub = AppState.addEventListener('change', nextAppState => {
         if (nextAppState === 'active') {
             updateUserStatus(true);
+            // Re-track as active in channel too
+            if (user?.id) {
+              trackPresence(channel, user.id, {
+                full_name: profile?.full_name || 'You',
+                profile_picture_url: profile?.profile_picture_url || undefined,
+              }, 'active');
+            }
         } else if (nextAppState.match(/inactive|background/)) {
             updateUserStatus(false);
         }
@@ -256,6 +357,7 @@ export default function ChatScreen() {
     return () => {
       msgSub.unsubscribe();
       voteSub.unsubscribe();
+      presenceSub.unsubscribe();
       channel.unsubscribe();
       appStateSub.remove();
       typingSub.unsubscribe();
@@ -285,7 +387,11 @@ export default function ChatScreen() {
   };
 
   const loadInitialData = async () => {
+    setLoading(true);
     try {
+      // 🚀 Trigger sending of any overdue scheduled messages
+      await flushScheduledMessages(eventId!);
+
       const [msgs, fetchedPolls, localDeletions] = await Promise.all([
         getMessages(eventId!),
         getPolls(eventId!),
@@ -295,6 +401,48 @@ export default function ChatScreen() {
       if (msgs && msgs.length > 0) {
         setMessages(msgs);
         setPinnedMessages(msgs.filter(m => m.is_pinned));
+        
+        // ✅ FIX: Handle "pending" messages from previous session
+        // If a message is stuck in 'pending', start/resume the confirmation timer.
+        const currentUserId = user?.id;
+        if (currentUserId) {
+            msgs.forEach(msg => {
+                if (msg.status === 'pending' && msg.sender_id === currentUserId) {
+                    const createdAt = new Date(msg.created_at).getTime();
+                    const now = Date.now();
+                    const elapsed = now - createdAt;
+                    const remaining = Math.max(0, 10000 - elapsed);
+
+                    if (remaining === 0) {
+                        // Already older than 10s, confirm immediately
+                        confirmMessageSent(msg.id).catch(console.error);
+                    } else {
+                        // Resume timer
+                        const timer = setTimeout(async () => {
+                            try {
+                                await confirmMessageSent(msg.id);
+                                setPendingMessages(prev => {
+                                    const next = {...prev};
+                                    delete next[msg.id];
+                                    return next;
+                                });
+                                setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, status: 'sent' } : m));
+                            } catch (e) {
+                                console.error("Auto-confirm failed", e);
+                            }
+                        }, remaining);
+                        setPendingMessages(prev => ({ ...prev, [msg.id]: timer }));
+                    }
+                }
+            });
+        }
+
+        // Fetch DB-backed presence status for all unique senders
+        const senderIds = [...new Set(msgs.map(m => m.sender_id).filter(id => id !== 'system'))];
+        if (senderIds.length > 0) {
+          const dbPresence = await getDbPresenceStatus(senderIds);
+          setDbProfiles(dbPresence);
+        }
       } else {
         setMessages([]);
         setPinnedMessages([]);
@@ -407,13 +555,24 @@ export default function ChatScreen() {
 
   const handlePin = async () => {
     if (!selectedMessage) return;
+    const msgId = selectedMessage.id;
+    const newPinnedStatus = !selectedMessage.is_pinned;
+    
+    // Optimistic UI
+    setMessages(prev => prev.map(m => m.id === msgId ? { ...m, is_pinned: newPinnedStatus } : m));
+    if (newPinnedStatus) {
+        setPinnedMessages(prev => [...prev, { ...selectedMessage, is_pinned: true }]);
+    } else {
+        setPinnedMessages(prev => prev.filter(m => m.id !== msgId));
+    }
+
     try {
-      await pinMessage(selectedMessage.id, !selectedMessage.is_pinned);
+      await pinMessage(msgId, newPinnedStatus);
       setDeleteModalVisible(false);
       setSelectedMessage(null);
-      loadInitialData();
     } catch (error) {
       Alert.alert("Error", "Failed to update pinned status.");
+      loadInitialData(); // Revert on error
     }
   };
 
@@ -446,12 +605,18 @@ export default function ChatScreen() {
 
   const handleDeleteForEveryone = async () => {
     if (!selectedMessage) return;
+    const msgId = selectedMessage.id;
+    
+    // Optimistic UI
+    setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: "[[DELETED]]", media_url: null } : m));
+
     try {
-      await deleteMessageForEveryone(selectedMessage.id);
+      await deleteMessageForEveryone(msgId);
       setDeleteModalVisible(false);
       setSelectedMessage(null);
     } catch (error) {
       Alert.alert("Error", "Failed to delete message for everyone.");
+      loadInitialData(); // Revert on error
     }
   };
 
@@ -462,25 +627,31 @@ export default function ChatScreen() {
       return;
     }
     try {
+      // createPoll no longer sends a message internally — we send ONE message here
       const poll = await createPoll(eventId!, pollQuestion, pollOptions.filter(o => o.trim()));
       setPollModalVisible(false);
       setPollQuestion("");
       setPollOptions(["", ""]);
-      // Refresh polls array instantly so it's ready before the message renders
+      // Refresh polls so it's ready before the message renders
       await fetchPolls();
-      await sendMessage(eventId!, `[[POLL:${poll.id}]]`);
+      // Send exactly ONE poll token message
+      const msg = await sendMessage(eventId!, `[[POLL:${poll.id}]]`);
+      if (msg) {
+        setMessages(prev => [...prev, msg]);
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+      }
     } catch (error) {
       Alert.alert("Error", "Failed to create poll.");
     }
   };
 
-  const handleVote = async (optionId: string) => {
+  const handleVote = async (optionId: string, pollId: string) => {
     try {
-      await voteInPoll(optionId);
+      await voteInPoll(optionId, pollId);
       // Optimistically fetch polls
       await fetchPolls();
     } catch (error) {
-      Alert.alert("Error", "Already voted or failed to record vote.");
+      Alert.alert("Error", "Failed to record vote.");
     }
   };
 
@@ -506,7 +677,11 @@ export default function ChatScreen() {
           longitude: location.coords.longitude
       };
       
-      await sendMessage(eventId!, "📍 Live Location", undefined, metadata);
+      const msg = await sendMessage(eventId!, "📍 Live Location", undefined, metadata);
+      if (msg) {
+        setMessages(prev => [...prev, msg]);
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+      }
     } catch (err) {
       Alert.alert("Error", "Could not fetch location.");
     }
@@ -515,7 +690,6 @@ export default function ChatScreen() {
   const handleSendMedia = async (source: 'gallery' | 'camera') => {
     setAttachModalVisible(false);
     
-    // Request permissions
     const permissionResult = source === 'camera' 
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -527,12 +701,12 @@ export default function ChatScreen() {
 
     const result = source === 'camera'
       ? await ImagePicker.launchCameraAsync({
-          mediaTypes: ['images', 'videos'],
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
           allowsEditing: true,
           quality: 0.7,
         })
       : await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ['images', 'videos'],
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
           allowsEditing: true,
           quality: 0.7,
         });
@@ -543,16 +717,22 @@ export default function ChatScreen() {
       try {
         const mimeType = asset.type === 'video' ? 'video/mp4' : 'image/jpeg';
         
-        // Use privacy-aware upload
+        // Upload to storage + insert into media table (returns { id, file_url, permission_type, expires_at })
         const mediaRecord = await uploadChatMedia(eventId!, asset.uri, mimeType, selectedPermission);
         
         const metadata: MessageMetadata = {
             type: asset.type === 'video' ? 'video' : 'image',
             permission_type: selectedPermission,
-            expires_at: mediaRecord.expires_at
+            expires_at: mediaRecord.expires_at,
+            // Store the media.id so requestMediaAccess works correctly
+            pollId: mediaRecord.id, // reusing pollId field as mediaRecordId
         };
         
-        await sendMessage(eventId!, "Media Attachment", mediaRecord.file_url, metadata);
+        const msg = await sendMessage(eventId!, "📎 Media Attachment", mediaRecord.file_url, metadata);
+        if (msg) {
+          setMessages(prev => [...prev, msg]);
+          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+        }
       } catch (err) {
         Alert.alert("Upload Failed", "Could not upload media.");
       } finally {
@@ -561,10 +741,11 @@ export default function ChatScreen() {
     }
   };
 
-  const handleRequestAccess = async (mediaId: string) => {
-    if (!mediaId) return;
+  // mediaRecordId comes from message metadata.pollId (we store media.id there)
+  const handleRequestAccess = async (mediaRecordId: string) => {
+    if (!mediaRecordId) return;
     try {
-        await requestMediaAccess(mediaId);
+        await requestMediaAccess(mediaRecordId);
         Alert.alert("Request Sent", "The media owner will review your access request.");
     } catch (err) {
         Alert.alert("Error", "Failed to request access.");
@@ -623,7 +804,7 @@ export default function ChatScreen() {
               <TouchableOpacity 
                 key={opt.id} 
                 style={styles.pollActionItem} 
-                onPress={() => handleVote(opt.id)}
+                onPress={() => handleVote(opt.id, poll.id)}
                 activeOpacity={0.7}
               >
                 <View style={styles.pollRadio} />
@@ -717,12 +898,13 @@ export default function ChatScreen() {
                 {isFirstInGroup && (
                   <View style={[
                     styles.avatarContainer,
-                    presenceState[item.sender_id]?.status === 'active' ? styles.avatarActive :
-                    presenceState[item.sender_id]?.status === 'idle' ? styles.avatarIdle :
-                    styles.avatarOffline
+                    getPresenceStyle(item.sender_id, presenceState, dbProfiles)
                   ]}>
                     <RNImage 
-                      source={{ uri: item.is_anonymous ? 'https://ui-avatars.com/api/?name=Anonymous&background=random' : (item.profiles?.avatar_url || `https://i.pravatar.cc/80?u=${item.sender_id}`) }} 
+                      source={{ uri: item.is_anonymous 
+                        ? 'https://ui-avatars.com/api/?name=Anonymous&background=random' 
+                        : (item.profiles?.profile_picture_url || `https://i.pravatar.cc/80?u=${item.sender_id}`) 
+                      }} 
                       style={styles.avatar} 
                     />
                   </View>
@@ -759,12 +941,13 @@ export default function ChatScreen() {
               {isFirstInGroup && (
                 <View style={[
                   styles.avatarContainer,
-                  presenceState[item.sender_id]?.status === 'active' ? styles.avatarActive :
-                  presenceState[item.sender_id]?.status === 'idle' ? styles.avatarIdle :
-                  styles.avatarOffline
+                  getPresenceStyle(item.sender_id, presenceState, dbProfiles)
                 ]}>
                   <RNImage 
-                    source={{ uri: item.is_anonymous ? 'https://ui-avatars.com/api/?name=Anonymous&background=random' : (item.profiles?.avatar_url || `https://i.pravatar.cc/80?u=${item.sender_id}`) }} 
+                    source={{ uri: item.is_anonymous 
+                      ? 'https://ui-avatars.com/api/?name=Anonymous&background=random' 
+                      : (item.profiles?.profile_picture_url || `https://i.pravatar.cc/80?u=${item.sender_id}`) 
+                    }} 
                     style={styles.avatar} 
                   />
                 </View>
@@ -910,7 +1093,10 @@ export default function ChatScreen() {
               {isFirstInGroup && (
                 <View style={[styles.avatarContainer, styles.avatarActive]}>
                   <RNImage 
-                    source={{ uri: item.is_anonymous ? 'https://ui-avatars.com/api/?name=Anonymous&background=random' : (item.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.profiles?.full_name || 'User')}`) }} 
+                    source={{ uri: item.is_anonymous 
+                      ? 'https://ui-avatars.com/api/?name=Anonymous&background=random' 
+                      : (profile?.profile_picture_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.profiles?.full_name || 'User')}`) 
+                    }} 
                     style={styles.avatar} 
                   />
                 </View>
@@ -952,10 +1138,14 @@ export default function ChatScreen() {
         <View style={styles.headerTitleContainer}>
           <View style={styles.headerTopRow}>
             <Text style={styles.headerTitle}>Event Chat</Text>
-            {/* Status Indicator Dot */}
+            {/* Status Indicator: green if anyone active in channel, yellow if in app only, red if all offline */}
             <View style={[
                 styles.statusDot, 
-                Object.values(presenceState).some(p => p.user_id !== user?.id && p.status === 'active') ? styles.onlineDot : styles.offlineDot 
+                Object.values(presenceState).some(p => p.user_id !== user?.id && p.status === 'active')
+                  ? styles.onlineDot
+                  : Object.values(dbProfiles).some(p => p.id !== user?.id && p.is_online)
+                  ? styles.idleDot
+                  : styles.offlineDot 
             ]} />
           </View>
           <View style={styles.headerSubRow}>
@@ -1293,6 +1483,25 @@ function getDateLabel(dateString: string) {
   yesterday.setDate(now.getDate() - 1);
   if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
   return date.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+}
+
+/**
+ * Returns the correct avatar border style based on 3-state presence:
+ * - 'active' in channel  → green (🟢 in chat AND in app)
+ * - in dbProfiles as online but NOT in channel → yellow (🟡 in app, not in chat)
+ * - offline everywhere → red (🔴)
+ */
+function getPresenceStyle(
+  userId: string,
+  presenceState: Record<string, any>,
+  dbProfiles: Record<string, any>
+) {
+  const channelStatus = presenceState[userId]?.status;
+  if (channelStatus === 'active') return styles.avatarActive;
+  if (channelStatus === 'idle') return styles.avatarIdle;
+  // Fallback to DB is_online
+  if (dbProfiles[userId]?.is_online === true) return styles.avatarIdle; // yellow = in app but not in chat
+  return styles.avatarOffline;
 }
 
 const styles = StyleSheet.create({
@@ -1644,8 +1853,9 @@ const styles = StyleSheet.create({
   typingText: { fontSize: 12, color: "#6366F1", fontWeight: "600", fontStyle: "italic" },
 
   statusDot: { width: 10, height: 10, borderRadius: 5, marginTop: 2, borderWidth: 1.5, borderColor: '#FFFFFF' },
-  onlineDot: { backgroundColor: "#10B981" },
-  offlineDot: { backgroundColor: "#EF4444" },
+  onlineDot: { backgroundColor: "#10B981" },  // 🟢 Green — active in chat channel
+  idleDot: { backgroundColor: "#F59E0B" },    // 🟡 Yellow — in app but not in chat
+  offlineDot: { backgroundColor: "#EF4444" }, // 🔴 Red — completely offline
 
   // Check-In Bar
   checkInBar: { 
