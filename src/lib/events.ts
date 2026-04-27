@@ -128,8 +128,43 @@ export async function joinEvent(eventId: string) {
         .single();
 
     if (error) throw error;
+
+    // Notify the event creator that someone joined their event directly
+    try {
+        const { data: event } = await supabase
+            .from("events")
+            .select("creator_id, title")
+            .eq("id", eventId)
+            .single();
+
+        if (event && event.creator_id !== userId) {
+            const { data: joiner } = await supabase
+                .from("profiles")
+                .select("full_name")
+                .eq("id", userId)
+                .single();
+
+            await supabase.from("notifications").insert({
+                user_id: event.creator_id,
+                actor_id: userId,
+                event_id: eventId,
+                type: "approval",
+                title: "New Participant 🎉",
+                body: `${joiner?.full_name || "Someone"} joined your event "${event.title}"`,
+                data: {
+                    eventId,
+                    route: `/chat/${eventId}`,
+                },
+            });
+        }
+    } catch (notifError) {
+        // Don't block joining if notification fails
+        console.warn("Join notification failed:", notifError);
+    }
+
     return data;
 }
+
 
 // ── Request to join an event (Request mode) ────────────────────
 export async function requestToJoin(eventId: string) {
