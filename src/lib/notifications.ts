@@ -45,12 +45,12 @@ export type Notification = {
 
 async function getCurrentUserId() {
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
-  return user.id;
+  return user?.id || null;
 }
 
 export async function getNotifications(): Promise<Notification[]> {
     const userId = await getCurrentUserId();
+    if (!userId) return [];
     const { data, error } = await supabase
         .from("notifications")
         .select(`
@@ -138,6 +138,7 @@ export async function markNotificationAsRead(id: string) {
 
 export async function markAllAsRead() {
     const userId = await getCurrentUserId();
+    if (!userId) return;
     const { error } = await supabase
         .from("notifications")
         .update({ is_read: true })
@@ -169,6 +170,7 @@ export function subscribeToNotifications(onNotification: (notification: Notifica
     };
 
     getCurrentUserId().then(userId => {
+        if (!userId) return;
         subscriptionWrapper.channel = supabase
             .channel(`notifications:${userId}:${channelId}`)
             .on(
@@ -217,6 +219,7 @@ export function subscribeToNotifications(onNotification: (notification: Notifica
 
 export async function getUnreadCount(): Promise<number> {
     const userId = await getCurrentUserId();
+    if (!userId) return 0;
     const { count, error } = await supabase
         .from("notifications")
         .select("*", { count: 'exact', head: true })

@@ -12,10 +12,10 @@ import {
   Text,
   TouchableOpacity,
   View,
-  ViewToken
+  ViewToken,
+  useWindowDimensions,
 } from "react-native";
 
-const { width, height } = Dimensions.get("window");
 
 // ── Onboarding Data ──────────────────────────────────────────────────────────
 const SLIDES = [
@@ -48,6 +48,7 @@ const SLIDES = [
 type Slide = (typeof SLIDES)[number];
 
 export default function OnboardingScreen() {
+  const { width, height } = useWindowDimensions();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList<Slide>>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
@@ -96,7 +97,7 @@ export default function OnboardingScreen() {
 
     return (
       <View style={[styles.slide, { width, height }]}>
-        <View style={styles.imageContainer}>
+        <View style={[styles.imageContainer, { width, height: height * 0.52 }]}>
           <Animated.Image
             source={item.image}
             style={[styles.image, { transform: [{ scale }] }]}
@@ -129,6 +130,8 @@ export default function OnboardingScreen() {
       {/* Layer 1: Swipeable Content */}
       <View style={StyleSheet.absoluteFill}>
         <Animated.FlatList
+          style={{ flex: 1, width, height }}
+          contentContainerStyle={{ width: width * SLIDES.length, height }}
           ref={flatListRef}
           data={SLIDES}
           keyExtractor={(item) => item.id}
@@ -215,12 +218,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#080E1C",
   },
   slide: {
-    width: width,
-    height: height,
+    // Width and height handled via inline styles from useWindowDimensions
   },
   imageContainer: {
-    width: width,
-    height: height * 0.52,
+    // Width and height handled via inline styles from useWindowDimensions
     overflow: "hidden",
   },
   image: {
