@@ -198,12 +198,12 @@ export async function sendInvitation(eventId: string, receiverId: string) {
     const senderId = await getCurrentUserId();
     const { data, error } = await supabase
         .from("event_invitations")
-        .upsert({
+        .insert({
             event_id: eventId,
             sender_id: senderId,
             receiver_id: receiverId,
             status: "pending",
-        }, { onConflict: 'event_id,receiver_id' })
+        })
         .select()
         .single();
 
@@ -341,4 +341,52 @@ export async function deleteEvent(eventId: string) {
         .delete()
         .eq("id", eventId);
     if (error) throw error;
+}
+
+export async function getMyEvents() {
+    const userId = await getCurrentUserId();
+    
+    const { data: created, error: err1 } = await supabase
+        .from('events')
+        .select(`
+            *,
+            host:profiles!creator_id (
+                full_name,
+                profile_picture_url
+            ),
+            participants:event_participants(count)
+        `)
+        .eq('creator_id', userId);
+
+    const { data: joined, error: err2 } = await supabase
+        .from('event_participants')
+        .select(`
+            event_id,
+            events (
+                *,
+                host:profiles!creator_id (
+                    full_name,
+                    profile_picture_url
+                ),
+                participants:event_participants(count)
+            )
+        `)
+        .eq('user_id', userId);
+
+    if (err1) throw err1;
+    if (err2) throw err2;
+
+    const joinedEvents = (joined || []).map((j: any) => j.events).filter(Boolean);
+    const all = [...(created || []), ...joinedEvents];
+    const unique = Array.from(new Map(all.map(e => [e.id, e])).values());
+
+    return unique.map(event => {
+        const hostData = Array.isArray(event.host) ? event.host[0] : event.host;
+        return {
+            ...event,
+            creatorName: hostData?.full_name || "Unknown User",
+            creatorAvatar: hostData?.profile_picture_url,
+            participantsCount: event.participants?.[0]?.count || 0
+        };
+    });
 }

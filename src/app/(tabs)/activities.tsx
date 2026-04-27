@@ -1,9 +1,10 @@
 import { Accent, BG, BR, FW, TX } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
 import { supabase } from '@/lib/supabase';
-import { getInvitations, acceptInvitation, declineInvitation, getJoinRequests, acceptJoinRequest, declineJoinRequest } from '@/lib/events';
-import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import { getInvitations, acceptInvitation, declineInvitation, getJoinRequests, acceptJoinRequest, declineJoinRequest, getMyEvents } from '@/lib/events';
+import EventCard from '@/components/EventCard';
 import {
     RefreshControl,
     ScrollView,
@@ -15,7 +16,7 @@ import {
     Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Check, X, Calendar, MapPin, Zap, Bell, UserPlus } from 'lucide-react-native';
+import { Check, X, Calendar, MapPin, Zap, Bell, UserPlus, Clock } from 'lucide-react-native';
 
 type Activity = {
   id: string;
@@ -76,6 +77,7 @@ export default function ActivitiesScreen() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [invites, setInvites] = useState<Invitation[]>([]);
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
+  const [userEvents, setUserEvents] = useState<any[]>([]);
   const [filter, setFilter] = useState<FilterType>('all');
   const [refreshing, setRefreshing] = useState(false);
 
@@ -87,7 +89,7 @@ export default function ActivitiesScreen() {
     if (!user) return;
     setRefreshing(true);
     try {
-        await Promise.all([loadActivities(), loadInvites(), loadJoinRequests()]);
+        await Promise.all([loadActivities(), loadInvites(), loadJoinRequests(), loadUserEvents()]);
     } catch (e) {
         console.error("Load error:", e);
     } finally {
@@ -122,6 +124,15 @@ export default function ActivitiesScreen() {
         setJoinRequests(data as any || []);
     } catch (e) {
         console.error("Fetch join requests error:", e);
+    }
+  }
+
+  async function loadUserEvents() {
+    try {
+        const data = await getMyEvents();
+        setUserEvents(data || []);
+    } catch (e) {
+        console.error("Fetch user events error:", e);
     }
   }
 
@@ -165,6 +176,26 @@ export default function ActivitiesScreen() {
 
   const filtered =
     filter === 'all' ? activities : activities.filter((a) => a.type === filter);
+
+  const formatTime = (timeStr: string): string => {
+    if (!timeStr) return '';
+    const [hourStr, minStr] = timeStr.split(':');
+    const hour = parseInt(hourStr, 10);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+    return `${hour12}:${minStr} ${ampm}`;
+  };
+
+  const formatDate = (dateStr: string): string => {
+    if (!dateStr) return '';
+    return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+  };
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const upcomingEvents = userEvents.filter(e => new Date(e.event_date) >= today);
+  const pastEvents = userEvents.filter(e => new Date(e.event_date) < today);
 
   const typeColor: Record<string, string> = {
     event: Accent.campus,
@@ -290,6 +321,10 @@ export default function ActivitiesScreen() {
                                     <Text style={styles.metaText}>{invite.events?.event_date}</Text>
                                 </View>
                                 <View style={styles.metaItem}>
+                                    <Clock size={12} color={TX.label} />
+                                    <Text style={styles.metaText}>{invite.events?.event_time?.substring(0, 5)}</Text>
+                                </View>
+                                <View style={styles.metaItem}>
                                     <MapPin size={12} color={TX.label} />
                                     <Text style={styles.metaText} numberOfLines={1}>{invite.events?.location}</Text>
                                 </View>
@@ -346,6 +381,10 @@ export default function ActivitiesScreen() {
                                 <View style={styles.metaItem}>
                                     <Calendar size={12} color={TX.label} />
                                     <Text style={styles.metaText}>{req.events?.event_date}</Text>
+                                </View>
+                                <View style={styles.metaItem}>
+                                    <Clock size={12} color={TX.label} />
+                                    <Text style={styles.metaText}>{req.events?.event_time?.substring(0, 5)}</Text>
                                 </View>
                                 <View style={styles.metaItem}>
                                     <MapPin size={12} color={TX.label} />
@@ -411,36 +450,99 @@ export default function ActivitiesScreen() {
                 </ScrollView>
 
                 {/* Grouped History List */}
-                {Object.keys(grouped).length === 0 ? (
-                    <View style={styles.emptyState}>
-                        <Text style={styles.emptyTitle}>No activities yet</Text>
-                        <Text style={styles.emptyDesc}>Join campus events to start tracking your performance!</Text>
+                {filter === 'event' ? (
+                    <View style={{ gap: 20 }}>
+                        {upcomingEvents.length > 0 && (
+                            <View>
+                                <Text style={styles.monthHeader}>Upcoming Events</Text>
+                                {upcomingEvents.map(event => (
+                                    <EventCard
+                                        key={event.id}
+                                        id={event.id}
+                                        title={event.title}
+                                        location={event.location}
+                                        date={formatDate(event.event_date)}
+                                        time={formatTime(event.event_time)}
+                                        peopleNeeded={event.people_needed}
+                                        category={event.category_id}
+                                        creatorId={event.creator_id}
+                                        creatorName={event.creatorName}
+                                        creatorAvatar={event.creatorAvatar}
+                                        joinMode={event.join_mode}
+                                        spotsJoined={event.participantsCount}
+                                        totalSpots={event.people_needed}
+                                        subcategoryLabel={event.subcategory_label}
+                                        currentUserId={user?.id}
+                                        onDelete={loadData}
+                                    />
+                                ))}
+                            </View>
+                        )}
+                        {pastEvents.length > 0 && (
+                            <View>
+                                <Text style={styles.monthHeader}>Past Events</Text>
+                                {pastEvents.map(event => (
+                                    <EventCard
+                                        key={event.id}
+                                        id={event.id}
+                                        title={event.title}
+                                        location={event.location}
+                                        date={formatDate(event.event_date)}
+                                        time={formatTime(event.event_time)}
+                                        peopleNeeded={event.people_needed}
+                                        category={event.category_id}
+                                        creatorId={event.creator_id}
+                                        creatorName={event.creatorName}
+                                        creatorAvatar={event.creatorAvatar}
+                                        joinMode={event.join_mode}
+                                        spotsJoined={event.participantsCount}
+                                        totalSpots={event.people_needed}
+                                        subcategoryLabel={event.subcategory_label}
+                                        currentUserId={user?.id}
+                                        onDelete={loadData}
+                                    />
+                                ))}
+                            </View>
+                        )}
+                        {upcomingEvents.length === 0 && pastEvents.length === 0 && (
+                            <View style={styles.emptyState}>
+                                <Text style={styles.emptyTitle}>No events yet</Text>
+                                <Text style={styles.emptyDesc}>Join campus events to start tracking your performance!</Text>
+                            </View>
+                        )}
                     </View>
                 ) : (
-                    Object.entries(grouped).map(([month, items]) => (
-                        <View key={month} style={styles.monthGroup}>
-                            <Text style={styles.monthHeader}>{month}</Text>
-                            {items.map((activity) => (
-                                <View key={activity.id} style={styles.activityCard}>
-                                    <View style={styles.activityLeft}>
-                                        <View style={[styles.typeBadge, { backgroundColor: `${typeColor[activity.type] || Accent.other}20` }]}>
-                                            <Text style={[styles.typeBadgeText, { color: typeColor[activity.type] || Accent.other }]}>
-                                                {activity.type.toUpperCase()}
+                    Object.keys(grouped).length === 0 ? (
+                        <View style={styles.emptyState}>
+                            <Text style={styles.emptyTitle}>No activities yet</Text>
+                            <Text style={styles.emptyDesc}>Join campus events to start tracking your performance!</Text>
+                        </View>
+                    ) : (
+                        Object.entries(grouped).map(([month, items]) => (
+                            <View key={month} style={styles.monthGroup}>
+                                <Text style={styles.monthHeader}>{month}</Text>
+                                {items.map((activity) => (
+                                    <View key={activity.id} style={styles.activityCard}>
+                                        <View style={styles.activityLeft}>
+                                            <View style={[styles.typeBadge, { backgroundColor: `${typeColor[activity.type] || Accent.other}20` }]}>
+                                                <Text style={[styles.typeBadgeText, { color: typeColor[activity.type] || Accent.other }]}>
+                                                    {activity.type.toUpperCase()}
+                                                </Text>
+                                            </View>
+                                            <Text style={styles.actTitle}>{activity.title}</Text>
+                                            <Text style={styles.actDate}>
+                                                {new Date(activity.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
                                             </Text>
                                         </View>
-                                        <Text style={styles.actTitle}>{activity.title}</Text>
-                                        <Text style={styles.actDate}>
-                                            {new Date(activity.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
-                                        </Text>
+                                        <View style={styles.pointsCol}>
+                                            <Text style={styles.pointsNum}>+{activity.points}</Text>
+                                            <Text style={styles.pointsLabel}>pts</Text>
+                                        </View>
                                     </View>
-                                    <View style={styles.pointsCol}>
-                                        <Text style={styles.pointsNum}>+{activity.points}</Text>
-                                        <Text style={styles.pointsLabel}>pts</Text>
-                                    </View>
-                                </View>
-                            ))}
-                        </View>
-                    ))
+                                ))}
+                            </View>
+                        ))
+                    )
                 )}
             </>
         )}

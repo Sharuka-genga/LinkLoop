@@ -308,7 +308,7 @@ export default function HomeScreen() {
         )}
 
         {/* ── Category Carousel ───────────────────────────── */}
-        <CategoryScroll />
+        <CategoryScroll onSelectCategory={(id) => setActiveFilter(id === activeFilter ? 'all' : id)} />
 
         {/* ── Events Feed ─────────────────────────────────── */}
         <View style={styles.sectionHeader}>
