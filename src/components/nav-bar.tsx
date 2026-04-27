@@ -1,5 +1,5 @@
+import { Home, Calendar, Plus, User, Sparkles } from 'lucide-react-native';
 import { usePathname, useRouter } from 'expo-router';
-import { Calendar, Home, Plus, Sparkles, User } from 'lucide-react-native';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 type NavItem = {
