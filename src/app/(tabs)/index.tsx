@@ -20,6 +20,7 @@ import { getEvents } from '@/lib/events';
 import { supabase } from '@/lib/supabase';
 import EventCard from '@/components/EventCard';
 import { CategoryScroll } from '@/components/CategoryScroll';
+import { getUnreadCount, subscribeToNotifications } from '@/lib/notifications';
 
 // ── Constants ──────────────────────────────────────────────────
 const FILTER_TABS = [
@@ -86,6 +87,7 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMode, setSearchMode] = useState('All');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const engagementScore = profile?.engagement_score ?? 0;
 
@@ -104,9 +106,9 @@ export default function HomeScreen() {
   useEffect(() => {
     loadEvents();
 
-    // Subscribe to realtime changes
+    // Subscribe to realtime changes with a unique channel name to avoid reuse errors
     const channel = supabase
-      .channel('schema-db-changes')
+      .channel(`index-events-${Date.now()}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'events' },
@@ -123,7 +125,34 @@ export default function HomeScreen() {
       supabase.removeChannel(channel);
     };
   }, []);
-  useFocusEffect(useCallback(() => { loadEvents(); }, []));
+
+  useEffect(() => {
+    // Initial unread count
+    const fetchUnread = async () => {
+      try {
+        const count = await getUnreadCount();
+        setUnreadCount(count);
+      } catch (err) {
+        console.error('Failed to fetch unread count:', err);
+      }
+    };
+    fetchUnread();
+
+    // Subscribe to notification updates
+    const subscription = subscribeToNotifications(() => {
+      fetchUnread();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useFocusEffect(useCallback(() => { 
+    loadEvents(); 
+    // Re-fetch unread count when screen comes into focus
+    getUnreadCount().then(setUnreadCount).catch(console.error);
+  }, []));
 
   const onRefresh = () => { setRefreshing(true); loadEvents(); };
 
@@ -191,9 +220,13 @@ export default function HomeScreen() {
             >
               <BookOpen size={20} color="#CBD5E1" strokeWidth={2} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.notifBtn}>
+            <TouchableOpacity 
+              style={styles.notifBtn}
+              onPress={() => router.push('/notifications')}
+              activeOpacity={0.7}
+            >
               <Bell size={20} color="#CBD5E1" strokeWidth={2} />
-              <View style={styles.notifDot} />
+              {unreadCount > 0 && <View style={styles.notifDot} />}
             </TouchableOpacity>
             {profile?.profile_picture_url ? (
               <Image source={{ uri: profile.profile_picture_url }} style={styles.avatar} />

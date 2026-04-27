@@ -115,7 +115,7 @@ export default function EventCard({
   };
 
   const handleOpenChat = () => {
-    Alert.alert("Opening Chat", "Redirecting to messaging portal...");
+    router.push(`/chat/${id}`);
   };
 
   return (
